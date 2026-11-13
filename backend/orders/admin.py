@@ -187,7 +187,7 @@ class StoreOrderAdmin(admin.ModelAdmin):
 class SiteSettingsAdmin(admin.ModelAdmin):
     fieldsets = (
         ("مشخصات", {"fields": ("site_name", "contact_phone", "contact_email", "contact_address", "working_hours")}),
-        ("شبکه‌های اجتماعی", {"fields": ("telegram_url", "bale_url", "instagram_url", "whatsapp_url")}),
+        ("شبکه‌های اجتماعی", {"fields": ("telegram_url", "bale_url", "instagram_url", "x_url", "whatsapp_url")}),
         ("نشان‌ها و پرداخت", {"fields": ("enamad_image_url", "payment_logo_url", "payment_enabled")}),
     )
 
