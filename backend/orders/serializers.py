@@ -5,7 +5,7 @@ from .models import Material, Machine, PrintOption, PrintOrder
 class MaterialSerializer(serializers.ModelSerializer):
     class Meta:
         model = Material
-        fields = ("id", "name", "technology", "price_per_gram_toman")
+        fields = ("id", "name", "technology", "price_per_gram_toman", "density_g_cm3")
 
 
 class MachineSerializer(serializers.ModelSerializer):
@@ -13,7 +13,7 @@ class MachineSerializer(serializers.ModelSerializer):
         model = Machine
         fields = ("id", "name", "technology", "hourly_rate_toman", "setup_fee_toman",
                   "build_x_mm", "build_y_mm", "build_z_mm", "nozzle_diameters",
-                  "min_layer_height_mm", "max_layer_height_mm")
+                  "min_layer_height_mm", "max_layer_height_mm", "max_print_speed_mm_s")
 
 
 class PrintOptionSerializer(serializers.ModelSerializer):
@@ -30,7 +30,7 @@ class PrintOrderSerializer(serializers.ModelSerializer):
         fields = (
             "public_id", "file", "original_filename", "technology", "material",
             "material_name", "machine", "color", "infill_percent", "layer_height_mm",
-            "nozzle_diameter_mm", "supports", "quantity", "estimated_weight_g", "estimated_hours",
+            "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "estimated_weight_g", "estimated_hours",
             "estimated_price_toman", "final_price_toman", "admin_note", "status",
             "created_at",
         )
@@ -41,6 +41,11 @@ class PrintOrderSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, attrs):
+        volume = attrs.get("model_volume_cm3", getattr(self.instance, "model_volume_cm3", 0))
+        if volume is not None and volume < 0:
+            raise serializers.ValidationError({"model_volume_cm3": "حجم مدل نمی‌تواند منفی باشد."})
+        if volume is not None and volume > 100000:
+            raise serializers.ValidationError({"model_volume_cm3": "حجم مدل از محدوده مجاز بیشتر است."})
         technology = attrs.get("technology", getattr(self.instance, "technology", None))
         material = attrs.get("material", getattr(self.instance, "material", None))
         machine = attrs.get("machine", getattr(self.instance, "machine", None))
