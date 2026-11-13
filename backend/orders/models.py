@@ -7,6 +7,7 @@ class Material(models.Model):
     name = models.CharField(max_length=100)
     technology = models.CharField(max_length=10, choices=TECHNOLOGY)
     price_per_gram_toman = models.PositiveIntegerField(default=0)
+    density_g_cm3 = models.DecimalField(max_digits=5, decimal_places=3, default=1.240, help_text="چگالی تقریبی ماده بر حسب گرم بر سانتی‌متر مکعب")
     is_active = models.BooleanField(default=True)
     def __str__(self): return f"{self.name} ({self.technology})"
 
@@ -75,6 +76,7 @@ class PrintOrder(models.Model):
     nozzle_diameter_mm = models.DecimalField(max_digits=4, decimal_places=2, default=0.40)
     supports = models.BooleanField(default=True)
     quantity = models.PositiveSmallIntegerField(default=1)
+    model_volume_cm3 = models.DecimalField(max_digits=10, decimal_places=3, default=0, help_text="حجم هندسی استخراج‌شده از فایل؛ برآورد اولیه و نه نتیجه اسلایسر")
     estimated_weight_g = models.DecimalField(max_digits=9, decimal_places=2, default=0)
     estimated_hours = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     estimated_price_toman = models.PositiveIntegerField(default=0)
