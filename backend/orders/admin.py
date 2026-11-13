@@ -79,7 +79,7 @@ class PrintOrderAdmin(admin.ModelAdmin):
         ("مشتری و فایل", {"fields": ("public_id", "customer", "file", "original_filename")}),
         ("تنظیمات چاپ (قابل ویرایش مدیر)", {"fields": (
             "technology", "material", "machine", "color", "infill_percent",
-            "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3")}),
+            "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "model_height_mm")}),
         ("برآورد و مبلغ نهایی", {"fields": (
             "estimated_weight_g", "estimated_hours", "estimated_price_toman",
             "final_price_toman")}),
@@ -90,7 +90,7 @@ class PrintOrderAdmin(admin.ModelAdmin):
         if change:
             old = PrintOrder.objects.get(pk=obj.pk)
             fields = ("technology", "material_id", "machine_id", "color", "infill_percent",
-                      "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "estimated_weight_g",
+                      "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "model_height_mm", "estimated_weight_g",
                       "estimated_hours", "estimated_price_toman", "final_price_toman",
                       "status", "admin_note", "file")
             before = {}
