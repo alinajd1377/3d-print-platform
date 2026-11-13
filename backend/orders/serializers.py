@@ -14,7 +14,8 @@ class MachineSerializer(serializers.ModelSerializer):
         model = Machine
         fields = ("id", "name", "technology", "hourly_rate_toman", "setup_fee_toman",
                   "build_x_mm", "build_y_mm", "build_z_mm", "nozzle_diameters",
-                  "min_layer_height_mm", "max_layer_height_mm", "max_print_speed_mm_s")
+                  "min_layer_height_mm", "max_layer_height_mm", "max_print_speed_mm_s",
+                  "resin_exposure_seconds_per_layer", "resin_lift_seconds_per_layer")
 
 
 class PrintOptionSerializer(serializers.ModelSerializer):
