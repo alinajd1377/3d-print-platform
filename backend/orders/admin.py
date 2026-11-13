@@ -190,6 +190,27 @@ class SiteSettingsAdmin(admin.ModelAdmin):
         ("شبکه‌های اجتماعی", {"fields": ("telegram_url", "bale_url", "instagram_url", "x_url", "whatsapp_url")}),
         ("نشان‌ها و پرداخت", {"fields": ("enamad_image_url", "payment_logo_url", "payment_enabled")}),
     )
+    list_display = ("site_name", "contact_phone", "contact_email", "updated_at")
+    readonly_fields = ("updated_at",)
 
     def has_add_permission(self, request):
-        return not SiteSettings.objects.exists()
+        return not self.model.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        from django.shortcuts import redirect
+        from django.urls import reverse
+
+        obj = self.model.objects.order_by("pk").first()
+        if obj:
+            url = reverse(
+                f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_change",
+                args=(obj.pk,),
+            )
+        else:
+            url = reverse(
+                f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_add"
+            )
+        return redirect(url)
