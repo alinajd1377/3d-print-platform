@@ -200,6 +200,7 @@ class SiteSettings(models.Model):
     telegram_url = models.URLField(blank=True)
     bale_url = models.URLField(blank=True)
     instagram_url = models.URLField(blank=True)
+    x_url = models.URLField(blank=True)
     whatsapp_url = models.URLField(blank=True)
     contact_address = models.TextField(blank=True)
     working_hours = models.CharField(max_length=180, blank=True)
