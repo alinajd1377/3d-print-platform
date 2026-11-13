@@ -26,6 +26,7 @@ class MachineAdmin(admin.ModelAdmin):
         ("محدوده چاپ (میلی‌متر)", {"fields": ("build_x_mm", "build_y_mm", "build_z_mm")}),
         ("محدودیت‌های فنی", {"fields": ("nozzle_diameters", "min_layer_height_mm",
                                       "max_layer_height_mm", "max_print_speed_mm_s",
+                                      "resin_exposure_seconds_per_layer", "resin_lift_seconds_per_layer",
                                       "supported_materials", "slicer_profile")}),
     )
 
