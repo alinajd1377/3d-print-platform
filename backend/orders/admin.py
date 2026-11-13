@@ -4,7 +4,7 @@ from .models import (
     Material, Machine, PricingRule, PrintOption, PrintOrder,
     OrderRevision, Invoice, Payment,
 )
-from .pricing import estimate_price
+from .pricing import estimate_price, estimate_geometry
 
 
 @admin.register(Material)
@@ -89,14 +89,27 @@ class PrintOrderAdmin(admin.ModelAdmin):
         if change:
             old = PrintOrder.objects.get(pk=obj.pk)
             fields = ("technology", "material_id", "machine_id", "color", "infill_percent",
-                      "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity", "estimated_weight_g",
+                      "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "estimated_weight_g",
                       "estimated_hours", "estimated_price_toman", "final_price_toman",
                       "status", "admin_note", "file")
             before = {}
             for field in fields:
                 value = getattr(old, field)
                 before[field] = str(value) if value is not None else None
-        # پس از تغییر تنظیمات فنی، برآورد دوباره با تعرفه فعلی محاسبه می‌شود.
+        # پس از تغییر تنظیمات فنی، وزن و زمان تخمینی نیز دوباره محاسبه می‌شوند.
+        if obj.technology == "FDM":
+            obj.estimated_weight_g, obj.estimated_hours = estimate_geometry(
+                volume_cm3=obj.model_volume_cm3,
+                density_g_cm3=obj.material.density_g_cm3,
+                infill_percent=obj.infill_percent,
+                nozzle_mm=obj.nozzle_diameter_mm,
+                layer_mm=obj.layer_height_mm,
+                machine=obj.machine,
+            )
+        else:
+            from decimal import Decimal
+            obj.estimated_weight_g = (Decimal(str(obj.model_volume_cm3 or 0)) * Decimal(str(obj.material.density_g_cm3))).quantize(Decimal("0.01"))
+            obj.estimated_hours = Decimal("0")
         rule = PricingRule.objects.filter(is_active=True).order_by("id").first()
         obj.estimated_price_toman = estimate_price(
             material=obj.material, machine=obj.machine,
