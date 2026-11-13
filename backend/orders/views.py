@@ -80,6 +80,13 @@ class OrderViewSet(viewsets.ModelViewSet):
                 float(value) for value in machine.nozzle_diameters
             }:
                 raise ValidationError({"nozzle_diameter_mm": "قطر نازل با دستگاه انتخاب‌شده سازگار نیست."})
+        if serializer.validated_data["technology"] == "FDM":
+            from decimal import Decimal
+            layer_check = Decimal(str(serializer.validated_data.get("layer_height_mm", "0.20")))
+            nozzle_check = Decimal(str(serializer.validated_data.get("nozzle_diameter_mm", "0.40")))
+            if layer_check > nozzle_check * Decimal("0.75"):
+                raise ValidationError({"layer_height_mm": "ضخامت لایه نباید بیشتر از ۷۵٪ قطر نازل باشد."})
+
         volume = serializer.validated_data.get("model_volume_cm3", 0)
         infill = serializer.validated_data.get("infill_percent", 20)
         supports = serializer.validated_data.get("supports", True)
