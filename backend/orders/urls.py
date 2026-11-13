@@ -9,7 +9,8 @@ router.register("machines", MachineViewSet, basename="machines")
 router.register("options", PrintOptionViewSet, basename="options")
 router.register("orders", OrderViewSet, basename="orders")
 
-urlpatterns = [\n    path("auth/mobile/", MobileAuthView.as_view(), name="mobile-auth"),
+urlpatterns = [
+    path("auth/mobile/", MobileAuthView.as_view(), name="mobile-auth"),
     path("profile/", MyProfileView.as_view(), name="my-profile"),
     path("store/products/", PublicStoreView.as_view(), name="store-products"),
     path("store/orders/", StoreOrderCreateView.as_view(), name="store-order-create"),
