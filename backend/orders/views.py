@@ -180,3 +180,77 @@ def zarinpal_callback(request, invoice_id):
             payment.save()
             result = "failed"
     return redirect(settings.FRONTEND_URL + f"/orders?payment={result}")
+
+
+from rest_framework.views import APIView
+from django.db.models import F
+from .models import CustomerProfile, StoreProduct, ProductVariant, StoreOrder, StoreOrderItem, SiteSettings
+from .serializers import CustomerProfileSerializer, StoreProductSerializer, StoreOrderCreateSerializer, SiteSettingsSerializer
+
+
+class MyProfileView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_profile(self, user):
+        profile, _ = CustomerProfile.objects.get_or_create(
+            user=user, defaults={"mobile": user.username[:20]}
+        )
+        return profile
+
+    def get(self, request):
+        return Response(CustomerProfileSerializer(self.get_profile(request.user)).data)
+
+    def patch(self, request):
+        profile = self.get_profile(request.user)
+        serializer = CustomerProfileSerializer(profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class PublicStoreView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        products = StoreProduct.objects.filter(is_active=True).prefetch_related("variants")
+        return Response(StoreProductSerializer(products, many=True).data)
+
+
+class StoreOrderCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = StoreOrderCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        with transaction.atomic():
+            variant = get_object_or_404(
+                ProductVariant.objects.select_for_update().select_related("product"),
+                pk=data["variant_id"], is_active=True, product__is_active=True
+            )
+            qty = data["quantity"]
+            enough_stock = variant.stock >= qty
+            order = StoreOrder.objects.create(
+                customer=request.user,
+                status=StoreOrder.Status.PENDING if enough_stock else StoreOrder.Status.COORDINATION,
+                total_toman=variant.price_toman * qty,
+                coordination_note="" if enough_stock else "موجودی کافی نیست؛ لطفاً برای هماهنگی با مشتری تماس گرفته شود."
+            )
+            StoreOrderItem.objects.create(
+                order=order, variant=variant, quantity=qty, unit_price_toman=variant.price_toman
+            )
+            if enough_stock:
+                ProductVariant.objects.filter(pk=variant.pk).update(stock=F("stock") - qty)
+        return Response({
+            "order_id": order.pk,
+            "status": order.status,
+            "total_toman": order.total_toman,
+            "message": "سفارش ثبت شد." if enough_stock else "موجودی کافی نیست؛ درخواست برای هماهنگی با پشتیبانی ثبت شد."
+        }, status=201)
+
+
+class PublicSiteSettingsView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        return Response(SiteSettingsSerializer(SiteSettings.load()).data)
