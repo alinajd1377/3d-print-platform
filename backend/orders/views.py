@@ -221,6 +221,25 @@ class PublicStoreView(APIView):
 class StoreOrderCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    def get(self, request):
+        orders = StoreOrder.objects.filter(customer=request.user).prefetch_related("items__variant__product")
+        result = []
+        for order in orders:
+            result.append({
+                "id": order.pk,
+                "status": order.status,
+                "total_toman": order.total_toman,
+                "created_at": order.created_at,
+                "coordination_note": order.coordination_note,
+                "items": [{
+                    "product": item.variant.product.title,
+                    "color": item.variant.color,
+                    "quantity": item.quantity,
+                    "unit_price_toman": item.unit_price_toman,
+                } for item in order.items.all()],
+            })
+        return Response(result)
+
     def post(self, request):
         serializer = StoreOrderCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
