@@ -108,9 +108,15 @@ class PrintOrderAdmin(admin.ModelAdmin):
                 machine=obj.machine,
             )
         else:
-            from decimal import Decimal
-            obj.estimated_weight_g = (Decimal(str(obj.model_volume_cm3 or 0)) * Decimal(str(obj.material.density_g_cm3))).quantize(Decimal("0.01"))
-            obj.estimated_hours = Decimal("0")
+            from decimal import Decimal, ROUND_CEILING
+            support_factor = Decimal("1.10") if obj.supports else Decimal("1.00")
+            obj.estimated_weight_g = (Decimal(str(obj.model_volume_cm3 or 0)) * Decimal(str(obj.material.density_g_cm3)) * support_factor).quantize(Decimal("0.01"))
+            if obj.machine and obj.model_height_mm > 0 and obj.layer_height_mm > 0:
+                layers = (obj.model_height_mm / obj.layer_height_mm).to_integral_value(rounding=ROUND_CEILING)
+                seconds = obj.machine.resin_exposure_seconds_per_layer + obj.machine.resin_lift_seconds_per_layer
+                obj.estimated_hours = (layers * seconds * Decimal("1.15") / Decimal("3600")).quantize(Decimal("0.01"))
+            else:
+                obj.estimated_hours = Decimal("0")
         rule = PricingRule.objects.filter(is_active=True).order_by("id").first()
         obj.estimated_price_toman = estimate_price(
             material=obj.material, machine=obj.machine,
