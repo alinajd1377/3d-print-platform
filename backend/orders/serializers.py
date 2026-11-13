@@ -72,3 +72,44 @@ class PrintOrderSerializer(serializers.ModelSerializer):
             if allowed and value not in allowed:
                 raise serializers.ValidationError({key: "این گزینه در حال حاضر فعال یا مجاز نیست."})
         return attrs
+
+
+from .models import CustomerProfile, StoreProduct, ProductVariant, StoreOrder, StoreOrderItem, SiteSettings
+
+
+class CustomerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomerProfile
+        fields = ("mobile", "full_name", "address", "postal_code", "updated_at")
+        read_only_fields = ("mobile", "updated_at")
+
+
+class ProductVariantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductVariant
+        fields = ("id", "color", "price_toman", "stock")
+
+
+class StoreProductSerializer(serializers.ModelSerializer):
+    variants = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StoreProduct
+        fields = ("id", "title", "slug", "description", "variants")
+
+    def get_variants(self, obj):
+        qs = obj.variants.filter(is_active=True)
+        return ProductVariantSerializer(qs, many=True).data
+
+
+class StoreOrderCreateSerializer(serializers.Serializer):
+    variant_id = serializers.IntegerField(min_value=1)
+    quantity = serializers.IntegerField(min_value=1, max_value=100)
+
+
+class SiteSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SiteSettings
+        fields = ("site_name", "contact_phone", "contact_email", "telegram_url", "bale_url",
+                  "instagram_url", "whatsapp_url", "contact_address", "working_hours",
+                  "enamad_image_url", "payment_logo_url", "payment_enabled")
