@@ -45,7 +45,7 @@ export default function OrderPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!file) { setMessage("لطفاً فایل سه‌بعدی را انتخاب کنید."); return; }
+    const auth = sessionStorage.getItem("authHeader");\n    if (!auth) { setMessage("برای ثبت سفارش ابتدا وارد حساب کاربری شوید."); return; }\n    if (!file) { setMessage("لطفاً فایل سه‌بعدی را انتخاب کنید."); return; }
     if (!material) { setMessage("ابتدا یک متریال فعال از فهرست انتخاب کنید."); return; }
     setBusy(true);
     const data = new FormData();
@@ -57,7 +57,7 @@ export default function OrderPage() {
     data.append("quantity",String(quantity));
     if (color) data.append("color",color);
     try {
-      const res = await fetch(`${API}/orders/`, {method:"POST",body:data,credentials:"include"});
+      const res = await fetch(`${API}/orders/`, {method:"POST",body:data,credentials:"include",headers:{Authorization:auth}});
       const body = await res.json().catch(()=>({}));
       if (res.status === 401 || res.status === 403) setMessage("برای ثبت سفارش ابتدا باید وارد حساب کاربری شوید. ورود با شماره موبایل در مرحله بعد تکمیل می‌شود.");
       else if (!res.ok) setMessage(body.detail || "ثبت سفارش انجام نشد؛ اطلاعات و اتصال API را بررسی کنید.");
@@ -89,7 +89,7 @@ export default function OrderPage() {
         </div>
         <div className="estimate-note"><ShieldCheck/><span><b>برآورد دقیق پس از بررسی</b><small>ابعاد، وزن و زمان چاپ توسط فرایند فنی تعیین می‌شود؛ امکان ورود دستی این مقادیر برای مشتری غیرفعال است.</small></span></div>
         <button className="btn submit-order" disabled={busy}>{busy?"در حال ارسال...":"ارسال سفارش برای بررسی"} <ArrowRight size={18}/></button>
-        <div role="status" className="form-message">{message}</div>
+        <div role="status" className="form-message">{message} <a href="/login">ورود / ثبت‌نام</a></div>
       </form>
     </div>
   </main>;
