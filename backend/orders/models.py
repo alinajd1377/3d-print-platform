@@ -116,3 +116,106 @@ class Payment(models.Model):
     raw_response = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     verified_at = models.DateTimeField(null=True, blank=True)
+
+class CustomerProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="customer_profile")
+    mobile = models.CharField(max_length=20, unique=True)
+    full_name = models.CharField(max_length=160, blank=True)
+    address = models.TextField(blank=True)
+    postal_code = models.CharField(max_length=20, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.full_name or self.mobile
+
+
+class StoreProduct(models.Model):
+    title = models.CharField(max_length=180)
+    slug = models.SlugField(max_length=200, unique=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return self.title
+
+
+class ProductVariant(models.Model):
+    product = models.ForeignKey(StoreProduct, on_delete=models.CASCADE, related_name="variants")
+    color = models.CharField(max_length=60)
+    sku = models.CharField(max_length=80, blank=True, unique=True, null=True)
+    price_toman = models.PositiveIntegerField()
+    stock = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ("product__title", "color")
+        constraints = [
+            models.UniqueConstraint(fields=("product", "color"), name="unique_product_color_variant")
+        ]
+
+    def __str__(self):
+        return f"{self.product.title} - {self.color}"
+
+
+class StoreOrder(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "در انتظار بررسی"
+        COORDINATION = "COORDINATION", "نیازمند هماهنگی موجودی"
+        CONFIRMED = "CONFIRMED", "تأیید شده"
+        PAID = "PAID", "پرداخت شده"
+        FULFILLING = "FULFILLING", "در حال آماده‌سازی"
+        SHIPPED = "SHIPPED", "ارسال شده"
+        COMPLETED = "COMPLETED", "تکمیل شده"
+        CANCELLED = "CANCELLED", "لغو شده"
+
+    customer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="store_orders")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    total_toman = models.PositiveIntegerField(default=0)
+    coordination_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"Store order #{self.pk}"
+
+
+class StoreOrderItem(models.Model):
+    order = models.ForeignKey(StoreOrder, on_delete=models.CASCADE, related_name="items")
+    variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT)
+    quantity = models.PositiveSmallIntegerField()
+    unit_price_toman = models.PositiveIntegerField()
+
+
+class SiteSettings(models.Model):
+    """Single editable row for public contact details and payment visibility."""
+    site_name = models.CharField(max_length=120, default="پرینت‌یار")
+    contact_phone = models.CharField(max_length=40, blank=True)
+    contact_email = models.EmailField(blank=True)
+    telegram_url = models.URLField(blank=True)
+    bale_url = models.URLField(blank=True)
+    instagram_url = models.URLField(blank=True)
+    whatsapp_url = models.URLField(blank=True)
+    contact_address = models.TextField(blank=True)
+    working_hours = models.CharField(max_length=180, blank=True)
+    enamad_image_url = models.URLField(blank=True)
+    payment_logo_url = models.URLField(blank=True)
+    payment_enabled = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "تنظیمات سایت"
