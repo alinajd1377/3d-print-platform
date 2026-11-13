@@ -21,9 +21,8 @@ def add_default_print_options(apps, schema_editor):
 
 
 def remove_default_print_options(apps, schema_editor):
-    PrintOption = apps.get_model("orders", "PrintOption")
-    keys = ["nozzle_diameter", "layer_height", "infill", "supports", "color"]
-    PrintOption.objects.filter(key__in=keys).delete()
+    # Keep admin-managed values intact if this migration is rolled back.
+    pass
 
 
 class Migration(migrations.Migration):
