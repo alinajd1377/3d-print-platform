@@ -5,12 +5,12 @@ import { ArrowRight, Save, LogOut, ClipboardList } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 type Profile = {mobile:string;full_name:string;address:string;postal_code:string};
-type Order = {public_id:string;technology:string;material_name:string;status:string;final_price_toman:number|null;created_at:string};
+type Order = {public_id:string;technology:string;material_name:string;status:string;final_price_toman:number|null;created_at:string};\ntype StoreOrder = {id:number;status:string;total_toman:number;created_at:string;coordination_note:string;items:{product:string;color:string;quantity:number}[]};
 const statusNames:Record<string,string>={DRAFT:"پیش‌نویس",REVIEW:"در انتظار بررسی",QUOTED:"پیش‌فاکتور صادر شده",PAID:"پرداخت شده",PRINTING:"در حال چاپ",READY:"آماده تحویل",SHIPPED:"ارسال شده",COMPLETED:"تکمیل شده",REJECTED:"رد شده"};
 
 export default function AccountPage() {
   const [profile,setProfile] = useState<Profile>({mobile:"",full_name:"",address:"",postal_code:""});
-  const [orders,setOrders] = useState<Order[]>([]);
+  const [orders,setOrders] = useState<Order[]>([]);\n  const [storeOrders,setStoreOrders] = useState<StoreOrder[]>([]);
   const [message,setMessage] = useState("");
   const [busy,setBusy] = useState(false);
   const auth = () => typeof window!=="undefined" ? sessionStorage.getItem("authHeader") || "" : "";
