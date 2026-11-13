@@ -8,13 +8,18 @@ import { ThreeMFLoader } from "three/examples/jsm/loaders/3MFLoader.js";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 type Material = { id:number; name:string; technology:"FDM"|"RESIN"; price_per_gram_toman:number };
-type Option = { id:number; key:string; label:string; value:string; technology:string };\ntype Machine = {id:number;name:string;technology:string;build_x_mm:number;build_y_mm:number;build_z_mm:number};\ntype ModelInfo = {x:number;y:number;z:number;volume:number};
+type Option = { id:number; key:string; label:string; value:string; technology:string };
+type Machine = {id:number;name:string;technology:string;build_x_mm:number;build_y_mm:number;build_z_mm:number};
+type ModelInfo = {x:number;y:number;z:number;volume:number};
 
 export default function OrderPage() {
   const [file,setFile] = useState<File|null>(null);
   const [technology,setTechnology] = useState<"FDM"|"RESIN">("FDM");
   const [materials,setMaterials] = useState<Material[]>([]);
-  const [options,setOptions] = useState<Option[]>([]);\n  const [machines,setMachines] = useState<Machine[]>([]);\n  const [modelInfo,setModelInfo] = useState<ModelInfo|null>(null);\n  const [fileError,setFileError] = useState("");
+  const [options,setOptions] = useState<Option[]>([]);
+  const [machines,setMachines] = useState<Machine[]>([]);
+  const [modelInfo,setModelInfo] = useState<ModelInfo|null>(null);
+  const [fileError,setFileError] = useState("");
   const [material,setMaterial] = useState("");
   const [infill,setInfill] = useState("20");
   const [layer,setLayer] = useState("0.20");
@@ -26,7 +31,8 @@ export default function OrderPage() {
   const [busy,setBusy] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/materials/`).then(r=>r.ok?r.json():[]).then((data:Material[])=>setMaterials(data)).catch(()=>setMaterials([]));\n    fetch(`${API}/machines/`).then(r=>r.ok?r.json():[]).then((data:Machine[])=>setMachines(data)).catch(()=>setMachines([]));
+    fetch(`${API}/materials/`).then(r=>r.ok?r.json():[]).then((data:Material[])=>setMaterials(data)).catch(()=>setMaterials([]));
+    fetch(`${API}/machines/`).then(r=>r.ok?r.json():[]).then((data:Machine[])=>setMachines(data)).catch(()=>setMachines([]));
   }, []);
   useEffect(() => {
     fetch(`${API}/options/?technology=${technology}`).then(r=>r.ok?r.json():[]).then((data:Option[])=>{
@@ -88,13 +94,17 @@ export default function OrderPage() {
   const layerOptions = values("layer_height");
   const nozzleOptions = values("nozzle_diameter");
   const colorOptions = values("color");
-  const supportOptions = values("supports");\n  const compatibleMachines = machines.filter(m=>m.technology===technology);\n  const fitsMachine = modelInfo && compatibleMachines.some(m=>modelInfo.x<=m.build_x_mm && modelInfo.y<=m.build_y_mm && modelInfo.z<=m.build_z_mm);
+  const supportOptions = values("supports");
+  const compatibleMachines = machines.filter(m=>m.technology===technology);
+  const fitsMachine = modelInfo && compatibleMachines.some(m=>modelInfo.x<=m.build_x_mm && modelInfo.y<=m.build_y_mm && modelInfo.z<=m.build_z_mm);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const auth = sessionStorage.getItem("authHeader");
     if (!auth) { setMessage("برای ثبت سفارش ابتدا وارد حساب کاربری شوید."); return; }
-    if (!file) { setMessage("لطفاً فایل سه‌بعدی را انتخاب کنید."); return; }\n    if (fileError) { setMessage(fileError); return; }\n    if (modelInfo && compatibleMachines.length>0 && !fitsMachine) { setMessage("ابعاد فایل با دستگاه‌های فعال این تکنولوژی سازگار نیست."); return; }
+    if (!file) { setMessage("لطفاً فایل سه‌بعدی را انتخاب کنید."); return; }
+    if (fileError) { setMessage(fileError); return; }
+    if (modelInfo && compatibleMachines.length>0 && !fitsMachine) { setMessage("ابعاد فایل با دستگاه‌های فعال این تکنولوژی سازگار نیست."); return; }
     if (!material) { setMessage("ابتدا یک متریال فعال از فهرست انتخاب کنید."); return; }
     setBusy(true);
     const data = new FormData();
