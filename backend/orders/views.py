@@ -1,10 +1,12 @@
 from django.conf import settings
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import authenticate, get_user_model, login as auth_login, logout as auth_logout
 from django.db import transaction
 from django.db.models import F
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import permissions, status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action, api_view, permission_classes
@@ -313,8 +315,15 @@ class PublicSiteSettingsView(APIView):
 class MobileAuthView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    @method_decorator(ensure_csrf_cookie)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
     def post(self, request):
         action_name = request.data.get("action", "login")
+        if action_name == "logout":
+            auth_logout(request)
+            return Response({"authenticated": False})
         mobile = str(request.data.get("mobile", "")).strip()
         password = str(request.data.get("password", ""))
         if not mobile or len(mobile) > 20 or not mobile.isdigit():
@@ -329,9 +338,11 @@ class MobileAuthView(APIView):
             full_name = str(request.data.get("full_name", "")).strip()
             user = User.objects.create_user(username=mobile, password=password, first_name=full_name[:150])
             CustomerProfile.objects.create(user=user, mobile=mobile, full_name=full_name[:160])
+            auth_login(request, user)
             return Response({"authenticated": True, "mobile": mobile}, status=201)
 
         user = authenticate(request, username=mobile, password=password)
         if user is None:
             return Response({"detail": "شماره موبایل یا رمز عبور صحیح نیست."}, status=400)
+        auth_login(request, user)
         return Response({"authenticated": True, "mobile": mobile})
