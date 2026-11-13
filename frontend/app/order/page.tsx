@@ -46,7 +46,8 @@ export default function OrderPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const auth = sessionStorage.getItem("authHeader");
-    if (!auth) { setMessage("برای ثبت سفارش ابتدا وارد حساب کاربری شوید."); return; }\n    if (!file) { setMessage("لطفاً فایل سه‌بعدی را انتخاب کنید."); return; }
+    if (!auth) { setMessage("برای ثبت سفارش ابتدا وارد حساب کاربری شوید."); return; }
+    if (!file) { setMessage("لطفاً فایل سه‌بعدی را انتخاب کنید."); return; }
     if (!material) { setMessage("ابتدا یک متریال فعال از فهرست انتخاب کنید."); return; }
     setBusy(true);
     const data = new FormData();
