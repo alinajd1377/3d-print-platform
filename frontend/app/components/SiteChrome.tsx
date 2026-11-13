@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Phone, Mail, MapPin, Clock3, Instagram, Send, MessageCircle, AtSign } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Phone, Mail, MapPin, Clock3, Instagram, Send, MessageCircle, AtSign, Box, ArrowLeft } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 type Settings = {site_name:string;contact_phone:string;contact_email:string;telegram_url:string;bale_url:string;instagram_url:string;x_url:string;whatsapp_url:string;contact_address:string;working_hours:string};
 
 export default function SiteChrome() {
+  const pathname = usePathname();
   const [settings,setSettings] = useState<Settings|null>(null);
   useEffect(()=>{fetch(`${API}/site-settings/`).then(r=>r.ok?r.json():null).then(setSettings).catch(()=>setSettings(null));},[]);
   const links = settings ? [
@@ -17,7 +19,13 @@ export default function SiteChrome() {
     {label:"اینستاگرام",href:settings.instagram_url,Icon:Instagram},
     {label:"ایکس / توییتر",href:settings.x_url,Icon:AtSign},
   ].filter(x=>x.href) : [];
-  return <footer className="global-footer">
+  return <>
+    {pathname !== "/" && <header className="topbar"><div className="container nav">
+      <a className="logo" href="/"><span className="logo-mark"><Box size={21}/></span> پرینت‌یار <small>3D PRINT</small></a>
+      <nav className="navlinks"><a href="/#services">خدمات</a><a href="/store">فروشگاه</a><a href="/account">حساب کاربری</a></nav>
+      <div className="nav-actions"><a className="btn nav-login" href="/login">ورود / ثبت‌نام</a><a className="btn nav-cta" href="/order">ثبت سفارش <ArrowLeft size={17}/></a></div>
+    </div></header>}
+    <footer className="global-footer">
     <div className="global-footer-inner">
       <div className="global-footer-brand"><a href="/" className="logo">پرینت‌یار <small>3D PRINT</small></a><p>از فایل سه‌بعدی تا قطعه واقعی، همراه شما هستیم.</p></div>
       <div className="global-footer-contact"><b>راه‌های ارتباطی</b><div className="global-socials">{links.map(({label,href,Icon})=><a key={label} href={href} aria-label={label} title={label} target={href.startsWith("http")?"_blank":undefined} rel="noreferrer"><Icon size={18}/><span>{label}</span></a>)}</div>
