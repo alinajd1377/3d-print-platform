@@ -114,13 +114,17 @@ export default function OrderPage() {
     if (nozzleOptions.length>0) data.append("nozzle_diameter_mm",nozzle);
     if (supportOptions.length>0) data.append("supports",String(supports));
     data.append("quantity",String(quantity));
+    if (modelInfo) data.append("model_volume_cm3",String(modelInfo.volume));
     if (color) data.append("color",color);
     try {
       const res = await fetch(`${API}/orders/`, {method:"POST",body:data,credentials:"include",headers:{Authorization:auth}});
       const body = await res.json().catch(()=>({}));
       if (res.status === 401 || res.status === 403) setMessage("برای ثبت سفارش ابتدا باید وارد حساب کاربری شوید. ورود با شماره موبایل در مرحله بعد تکمیل می‌شود.");
       else if (!res.ok) setMessage(body.detail || "ثبت سفارش انجام نشد؛ اطلاعات و اتصال API را بررسی کنید.");
-      else setMessage("سفارش ثبت شد و برای بررسی فنی ارسال می‌شود. وزن، زمان و مبلغ نهایی پس از بررسی اعلام خواهد شد.");
+      else {
+        const estimate = `وزن تخمینی: ${Number(body.estimated_weight_g||0).toFixed(2)} گرم | زمان تخمینی: ${Number(body.estimated_hours||0).toFixed(2)} ساعت | مبلغ اولیه: ${Number(body.estimated_price_toman||0).toLocaleString("fa-IR")} تومان`;
+        setMessage(`سفارش ثبت شد. ${estimate} — این مبلغ برآورد اولیه است و پس از اسلایس واقعی و بررسی کارشناس نهایی می‌شود.${technology === "RESIN" ? " زمان چاپ رزینی هنوز از پروفایل نوردهی محاسبه نمی‌شود." : ""}`);
+      }
     } catch { setMessage("ارتباط با سرور برقرار نشد."); }
     finally { setBusy(false); }
   }
@@ -148,7 +152,7 @@ export default function OrderPage() {
           </div>
           {supportOptions.length>0&&<label className="field-label">ساپورت<select value={String(supports)} onChange={e=>setSupports(e.target.value==="true")}><option value="true" disabled={!supportOptions.includes("true")}>با ساپورت</option><option value="false" disabled={!supportOptions.includes("false")}>بدون ساپورت</option></select></label>}
         </div>
-        <div className="estimate-note"><ShieldCheck/><span><b>نمایش آنلاین ابعاد و بررسی ظرفیت دستگاه</b><small>ابعاد و حجم هندسی بلافاصله از فایل استخراج می‌شوند. وزن، زمان و مبلغ معتبر نیازمند اجرای Slicer با پروفایل واقعی دستگاه است؛ از نمایش عدد ساختگی خودداری می‌کنیم.</small></span></div>
+        <div className="estimate-note"><ShieldCheck/><span><b>برآورد اولیه وزن، زمان و قیمت</b><small>برای FDM، وزن و زمان با حجم هندسی، چگالی متریال، تراکم، نازل، لایه و تعرفه دستگاه تخمین زده می‌شود. این عدد جایگزین خروجی PrusaSlicer نیست و قیمت نهایی پس از بررسی فایل اعلام می‌شود. برای رزین، زمان چاپ به پروفایل نوردهی نیاز دارد.</small></span></div>
         <button className="btn submit-order" disabled={busy}>{busy?"در حال ارسال...":"ارسال سفارش برای بررسی"} <ArrowRight size={18}/></button>
         <div role="status" className="form-message">{message} <a href="/login">ورود / ثبت‌نام</a></div>
       </form>
