@@ -115,7 +115,7 @@ export default function OrderPage() {
     if (nozzleOptions.length>0) data.append("nozzle_diameter_mm",nozzle);
     if (supportOptions.length>0) data.append("supports",String(supports));
     data.append("quantity",String(quantity));
-    if (modelInfo) data.append("model_volume_cm3",String(modelInfo.volume));
+    if (modelInfo) { data.append("model_volume_cm3",String(modelInfo.volume)); data.append("model_height_mm",String(modelInfo.z)); }
     if (color) data.append("color",color);
     try {
       const res = await fetch(`${API}/orders/`, {method:"POST",body:data,credentials:"include",headers:{Authorization:auth}});
