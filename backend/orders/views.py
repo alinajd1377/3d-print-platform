@@ -104,17 +104,26 @@ class OrderViewSet(viewsets.ModelViewSet):
                 machine=machine,
             )
         else:
-            # رزین به‌صورت حجم جامد تخمین زده می‌شود؛ زمان چاپ رزینی به زمان نوردهی/پروفایل نیاز دارد.
-            from decimal import Decimal
-            weight = (Decimal(str(volume or 0)) * Decimal(str(material.density_g_cm3))).quantize(Decimal("0.01"))
-            hours = Decimal("0")
+            # تخمین رزین بر پایه حجم جامد و تعداد لایه‌هاست؛ مدل‌های توخالی ممکن است بیش‌برآورد شوند.
+            from decimal import Decimal, ROUND_CEILING
+            weight_factor = Decimal("1.10") if supports else Decimal("1.00")
+            weight = (Decimal(str(volume or 0)) * Decimal(str(material.density_g_cm3)) * weight_factor).quantize(Decimal("0.01"))
+            height = Decimal(str(serializer.validated_data.get("model_height_mm", 0) or 0))
+            layer_height = Decimal(str(layer or "0.05"))
+            if machine and height > 0 and layer_height > 0:
+                layer_count = (height / layer_height).to_integral_value(rounding=ROUND_CEILING)
+                seconds_per_layer = machine.resin_exposure_seconds_per_layer + machine.resin_lift_seconds_per_layer
+                hours = (layer_count * seconds_per_layer * Decimal("1.15") / Decimal("3600")).quantize(Decimal("0.01"))
+            else:
+                hours = Decimal("0")
 
         rule = PricingRule.objects.filter(is_active=True).order_by("id").first()
         price = estimate_price(material=material, machine=machine, weight_g=weight,
                                hours=hours, infill_percent=infill, supports=supports,
                                quantity=qty, rule=rule)
         serializer.save(customer=self.request.user, machine=machine,
-                        model_volume_cm3=volume, estimated_weight_g=weight,
+                        model_volume_cm3=volume,
+                        model_height_mm=serializer.validated_data.get("model_height_mm", 0), estimated_weight_g=weight,
                         estimated_hours=hours, estimated_price_toman=price,
                         original_filename=uploaded.name if uploaded else "")
 
