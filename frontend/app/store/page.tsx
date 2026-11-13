@@ -43,6 +43,7 @@ export default function StorePage() {
         <div className="variant-list">{product.variants.map(v=><div className="variant-row" key={v.id}>
           <span>{v.color}<small>{v.stock>0?`موجودی: ${v.stock}`:"ناموجود / نیازمند هماهنگی"}</small></span>
           <b>{toman(v.price_toman)}</b>
+          <label className="store-qty">تعداد<input type="number" min="1" max="100" value={quantities[v.id]||1} onChange={e=>setQuantities({...quantities,[v.id]:Math.max(1,Math.min(100,+e.target.value||1))})}/></label>
           <button disabled={busy!==null || v.stock===0} onClick={()=>order(v.id)}>{busy===v.id?"...":"سفارش"}</button>
         </div>)}</div>
       </article>)}</div>}
