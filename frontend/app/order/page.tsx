@@ -124,7 +124,7 @@ export default function OrderPage() {
       else if (!res.ok) setMessage(body.detail || "ثبت سفارش انجام نشد؛ اطلاعات و اتصال API را بررسی کنید.");
       else {
         const estimate = `وزن تخمینی: ${Number(body.estimated_weight_g||0).toFixed(2)} گرم | زمان تخمینی: ${Number(body.estimated_hours||0).toFixed(2)} ساعت | مبلغ اولیه: ${Number(body.estimated_price_toman||0).toLocaleString("fa-IR")} تومان`;
-        setMessage(`سفارش ثبت شد. ${estimate} — این مبلغ برآورد اولیه است و پس از اسلایس واقعی و بررسی کارشناس نهایی می‌شود.${technology === "RESIN" ? " زمان چاپ رزینی هنوز از پروفایل نوردهی محاسبه نمی‌شود." : ""}`);
+        setMessage(`سفارش ثبت شد. ${estimate} — این مبلغ برآورد اولیه است و پس از اسلایس واقعی و بررسی کارشناس نهایی می‌شود.${technology === "RESIN" ? " برآورد رزین بر اساس زمان نوردهی دستگاه است؛ مدل‌های توخالی ممکن است وزن واقعی کمتری داشته باشند." : ""}`);
       }
     } catch { setMessage("ارتباط با سرور برقرار نشد."); }
     finally { setBusy(false); }
@@ -153,7 +153,7 @@ export default function OrderPage() {
           </div>
           {supportOptions.length>0&&<label className="field-label">ساپورت<select value={String(supports)} onChange={e=>setSupports(e.target.value==="true")}><option value="true" disabled={!supportOptions.includes("true")}>با ساپورت</option><option value="false" disabled={!supportOptions.includes("false")}>بدون ساپورت</option></select></label>}
         </div>
-        <div className="estimate-note"><ShieldCheck/><span><b>برآورد اولیه وزن، زمان و قیمت</b><small>برای FDM، وزن و زمان با حجم هندسی، چگالی متریال، تراکم، نازل، لایه و تعرفه دستگاه تخمین زده می‌شود. این عدد جایگزین خروجی PrusaSlicer نیست و قیمت نهایی پس از بررسی فایل اعلام می‌شود. برای رزین، زمان چاپ به پروفایل نوردهی نیاز دارد.</small></span></div>
+        <div className="estimate-note"><ShieldCheck/><span><b>برآورد اولیه وزن، زمان و قیمت</b><small>برای FDM، وزن و زمان با حجم هندسی، چگالی متریال، تراکم، نازل، لایه و تعرفه دستگاه تخمین زده می‌شود. این عدد جایگزین خروجی PrusaSlicer نیست و قیمت نهایی پس از بررسی فایل اعلام می‌شود. برای رزین، زمان از ارتفاع مدل، ضخامت لایه و زمان نوردهی و بالاآمدن هر لایه تخمین زده می‌شود؛ مدل‌های توخالی ممکن است وزن واقعی کمتری داشته باشند.</small></span></div>
         <button className="btn submit-order" disabled={busy}>{busy?"در حال ارسال...":"ارسال سفارش برای بررسی"} <ArrowRight size={18}/></button>
         <div role="status" className="form-message">{message} <a href="/login">ورود / ثبت‌نام</a></div>
       </form>
