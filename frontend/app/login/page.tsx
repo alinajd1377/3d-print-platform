@@ -19,15 +19,12 @@ export default function LoginPage() {
     e.preventDefault(); setBusy(true); setMessage("");
     try {
       const response = await fetch(`${API}/auth/mobile/`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method:"POST", credentials:"include", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({action:mode,mobile,password,full_name:fullName})
       });
       const data = await response.json().catch(()=>({}));
       if (!response.ok) { setMessage(data.detail || "ورود یا ثبت‌نام انجام نشد."); return; }
-      const bytes = new TextEncoder().encode(mobile + ":" + password);
-      const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join("");
-      sessionStorage.setItem("authHeader", "Basic " + btoa(binary));
-      router.push("/account");
+      router.push("/order");
     } catch { setMessage("ارتباط با سرور برقرار نشد."); }
     finally { setBusy(false); }
   }
