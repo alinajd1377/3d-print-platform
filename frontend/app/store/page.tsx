@@ -11,7 +11,8 @@ const toman = (value:number) => new Intl.NumberFormat("fa-IR").format(value) + "
 
 export default function StorePage() {
   const [products,setProducts] = useState<Product[]>([]);
-  const [busy,setBusy] = useState<number|null>(null);\n  const [quantities,setQuantities] = useState<Record<number,number>>({});
+  const [busy,setBusy] = useState<number|null>(null);
+  const [quantities,setQuantities] = useState<Record<number,number>>({});
   const [message,setMessage] = useState("برای ثبت سفارش کالا، ابتدا باید وارد حساب کاربری شوید.");
   useEffect(() => {
     fetch(`${API}/store/products/`).then(r=>r.ok?r.json():[]).then(setProducts).catch(()=>setMessage("دریافت محصولات با خطا مواجه شد."));
