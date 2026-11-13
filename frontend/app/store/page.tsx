@@ -22,7 +22,6 @@ export default function StorePage() {
     try {
       const response = await fetch(`${API}/store/orders/`, {
         method:"POST", credentials:"include", headers:{"Content-Type":"application/json",Authorization:sessionStorage.getItem("authHeader")||""},
-        headers:{"Content-Type":"application/json"},
         body:JSON.stringify({variant_id:variantId,quantity:1})
       });
       const result = await response.json().catch(()=>({}));
