@@ -122,7 +122,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def pay_invoice(request, invoice_id):
-    if not settings.PAYMENTS_ENABLED:
+    if not settings.PAYMENTS_ENABLED or not SiteSettings.load().payment_enabled:
         return Response({"detail": "پرداخت آنلاین هنوز فعال نشده است."}, status=503)
     invoice = get_object_or_404(Invoice.objects.select_related("order"), pk=invoice_id, order__customer=request.user)
     if invoice.is_paid:
