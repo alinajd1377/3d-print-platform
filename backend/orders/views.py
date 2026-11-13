@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth import authenticate, get_user_model
 from django.db import transaction
 from django.db.models import F
 from django.db.models import Q
@@ -255,3 +256,30 @@ class PublicSiteSettingsView(APIView):
 
     def get(self, request):
         return Response(SiteSettingsSerializer(SiteSettings.load()).data)
+
+
+class MobileAuthView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        action_name = request.data.get("action", "login")
+        mobile = str(request.data.get("mobile", "")).strip()
+        password = str(request.data.get("password", ""))
+        if not mobile or len(mobile) > 20 or not mobile.isdigit():
+            return Response({"detail": "شماره موبایل معتبر وارد کنید."}, status=400)
+        if len(password) < 8:
+            return Response({"detail": "رمز عبور باید حداقل ۸ کاراکتر باشد."}, status=400)
+
+        User = get_user_model()
+        if action_name == "register":
+            if User.objects.filter(username=mobile).exists() or CustomerProfile.objects.filter(mobile=mobile).exists():
+                return Response({"detail": "این شماره موبایل قبلاً ثبت شده است."}, status=400)
+            full_name = str(request.data.get("full_name", "")).strip()
+            user = User.objects.create_user(username=mobile, password=password, first_name=full_name[:150])
+            CustomerProfile.objects.create(user=user, mobile=mobile, full_name=full_name[:160])
+            return Response({"authenticated": True, "mobile": mobile}, status=201)
+
+        user = authenticate(request, username=mobile, password=password)
+        if user is None:
+            return Response({"detail": "شماره موبایل یا رمز عبور صحیح نیست."}, status=400)
+        return Response({"authenticated": True, "mobile": mobile})
