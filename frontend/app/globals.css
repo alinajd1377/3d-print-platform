@@ -14,3 +14,53 @@
 
 .order-page{min-height:100vh;padding:42px 18px 80px;background:radial-gradient(circle at 8% 5%,#e9edff 0,transparent 26%),#f7f8fc}.order-wrap{width:min(820px,100%);margin:auto}.back-link{display:inline-flex;align-items:center;gap:8px;color:#63708a;font-size:13px}.order-heading{margin:28px 0 24px}.order-heading h1{font-size:30px;margin:7px 0}.order-heading p{color:#718098;font-size:13px;line-height:2}.order-form{background:white;border:1px solid #e8ebf2;border-radius:24px;padding:26px;box-shadow:0 20px 60px #1b2b5010;display:grid;gap:25px}.form-section{display:grid;gap:13px}.form-title{display:flex;align-items:center;gap:12px;margin-bottom:3px}.form-title>span{width:42px;height:42px;border-radius:13px;background:#edf1ff;color:#536ff0;display:grid;place-items:center}.form-title svg{width:20px}.form-title b,.form-title small{display:block}.form-title b{font-size:14px}.form-title small{font-size:11px;color:#8792a7;margin-top:4px}.upload-zone{border:1.5px dashed #cbd3e6;border-radius:16px;background:#fafbff;padding:26px 15px;display:grid;justify-items:center;gap:8px;color:#6175d8;cursor:pointer}.upload-zone input{display:none}.upload-zone b{font-size:13px;color:#293653;max-width:100%;overflow-wrap:anywhere}.upload-zone small{font-size:11px;color:#8a95a9}.field-label{display:grid;gap:8px;font-size:12px;font-weight:700;color:#485570}.field-label select,.field-label input{width:100%;border:1px solid #e0e5ef;border-radius:11px;background:#fff;padding:12px 13px;font:inherit;font-size:13px;color:#26334e;outline:none}.field-label select:focus,.field-label input:focus{border-color:#7d91f7;box-shadow:0 0 0 3px #536ff015}.technology-choice{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tech{display:grid;gap:4px;text-align:right;border:1px solid #e2e7f0;border-radius:13px;background:#fff;padding:13px 15px;font:inherit;cursor:pointer;color:#38445f}.tech b{font-size:14px}.tech small{font-size:11px;color:#8994a8}.tech.active{border-color:#7186f6;background:#f3f5ff;box-shadow:0 0 0 2px #7186f61c}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}.support-choice{display:flex;align-items:center;gap:9px;font-size:12px;color:#56627a}.support-choice input{accent-color:#526ff5;width:16px;height:16px}.estimate-note{display:flex;gap:12px;padding:15px;border-radius:14px;background:#f1f7ff;color:#5271d9}.estimate-note svg{flex:none;width:22px}.estimate-note b,.estimate-note small{display:block}.estimate-note b{font-size:12px}.estimate-note small{font-size:11px;line-height:1.9;color:#74829d;margin-top:4px}.submit-order{width:100%;padding:15px}.submit-order:disabled{opacity:.6;cursor:wait}.form-message{font-size:12px;color:#4c619e;background:#f2f5ff;padding:12px 14px;border-radius:12px;line-height:1.9}
 @media(max-width:600px){.order-page{padding:25px 12px 50px}.order-form{padding:18px;border-radius:18px}.order-heading h1{font-size:24px}.form-grid{grid-template-columns:1fr}.form-title small{line-height:1.8}}
+
+/* Phase 5 — scroll-linked printer demonstration */
+@supports (animation-timeline: scroll()) {
+  .printer-head {
+    animation: printer-nozzle-scroll linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0% 58%;
+    will-change: transform;
+  }
+  .printed-object {
+    transform-origin: center bottom;
+    animation: printed-part-scroll linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0% 58%;
+    will-change: transform;
+  }
+  .printer-head::before {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    top: 26px;
+    right: 16px;
+    width: 4px;
+    height: 0;
+    border-radius: 0 0 4px 4px;
+    background: linear-gradient(180deg, #8de5dc, #5c9df5);
+    transform-origin: top center;
+    animation: filament-flow-scroll linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0% 58%;
+  }
+}
+@keyframes printer-nozzle-scroll {
+  from { transform: translateY(0); }
+  to { transform: translateY(105px); }
+}
+@keyframes printed-part-scroll {
+  from { transform: scaleY(.18); }
+  to { transform: scaleY(1); }
+}
+@keyframes filament-flow-scroll {
+  from { height: 0; opacity: .25; }
+  to { height: 62px; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .printer-head, .printed-object, .printer-head::before {
+    animation: none !important;
+    transform: none !important;
+  }
+}
