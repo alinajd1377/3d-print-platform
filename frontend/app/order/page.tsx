@@ -1,16 +1,20 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, UploadCloud, FileBox, ShieldCheck, Layers3 } from "lucide-react";
+import { ArrowRight, UploadCloud, FileBox, ShieldCheck, Layers3, Ruler, Box, Info } from "lucide-react";
+import * as THREE from "three";
+import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
+import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { ThreeMFLoader } from "three/examples/jsm/loaders/3MFLoader.js";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 type Material = { id:number; name:string; technology:"FDM"|"RESIN"; price_per_gram_toman:number };
-type Option = { id:number; key:string; label:string; value:string; technology:string };
+type Option = { id:number; key:string; label:string; value:string; technology:string };\ntype Machine = {id:number;name:string;technology:string;build_x_mm:number;build_y_mm:number;build_z_mm:number};\ntype ModelInfo = {x:number;y:number;z:number;volume:number};
 
 export default function OrderPage() {
   const [file,setFile] = useState<File|null>(null);
   const [technology,setTechnology] = useState<"FDM"|"RESIN">("FDM");
   const [materials,setMaterials] = useState<Material[]>([]);
-  const [options,setOptions] = useState<Option[]>([]);
+  const [options,setOptions] = useState<Option[]>([]);\n  const [machines,setMachines] = useState<Machine[]>([]);\n  const [modelInfo,setModelInfo] = useState<ModelInfo|null>(null);\n  const [fileError,setFileError] = useState("");
   const [material,setMaterial] = useState("");
   const [infill,setInfill] = useState("20");
   const [layer,setLayer] = useState("0.20");
@@ -22,7 +26,7 @@ export default function OrderPage() {
   const [busy,setBusy] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/materials/`).then(r=>r.ok?r.json():[]).then((data:Material[])=>setMaterials(data)).catch(()=>setMaterials([]));
+    fetch(`${API}/materials/`).then(r=>r.ok?r.json():[]).then((data:Material[])=>setMaterials(data)).catch(()=>setMaterials([]));\n    fetch(`${API}/machines/`).then(r=>r.ok?r.json():[]).then((data:Machine[])=>setMachines(data)).catch(()=>setMachines([]));
   }, []);
   useEffect(() => {
     fetch(`${API}/options/?technology=${technology}`).then(r=>r.ok?r.json():[]).then((data:Option[])=>{
@@ -35,19 +39,62 @@ export default function OrderPage() {
     }).catch(()=>setOptions([]));
     setMaterial(""); setColor("");
   }, [technology]);
+  useEffect(() => {
+    let cancelled = false;
+    async function inspectModel() {
+      setModelInfo(null); setFileError("");
+      if (!file) return;
+      if (file.size > 100*1024*1024) { setFileError("حجم فایل نباید بیشتر از ۱۰۰ مگابایت باشد."); return; }
+      try {
+        const ext = file.name.toLowerCase().split(".").pop();
+        const buffer = await file.arrayBuffer();
+        let root: THREE.Object3D;
+        if (ext === "stl") root = new STLLoader().parse(buffer);
+        else if (ext === "obj") root = new OBJLoader().parse(await file.text());
+        else if (ext === "3mf") root = new ThreeMFLoader().parse(buffer);
+        else throw new Error("فرمت فایل پشتیبانی نمی‌شود.");
+        root.updateMatrixWorld(true);
+        const bounds = new THREE.Box3().setFromObject(root);
+        if (bounds.isEmpty()) throw new Error("هندسه قابل تشخیص در فایل پیدا نشد.");
+        const size = bounds.getSize(new THREE.Vector3());
+        let signedVolume = 0;
+        root.traverse(node => {
+          if (!(node instanceof THREE.Mesh)) return;
+          const geometry = node.geometry;
+          const position = geometry.getAttribute("position");
+          const index = geometry.getIndex();
+          const count = index ? index.count : position.count;
+          const a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3();
+          for (let i=0;i+2<count;i+=3) {
+            const ia=index?index.getX(i):i, ib=index?index.getX(i+1):i+1, ic=index?index.getX(i+2):i+2;
+            a.fromBufferAttribute(position,ia).applyMatrix4(node.matrixWorld);
+            b.fromBufferAttribute(position,ib).applyMatrix4(node.matrixWorld);
+            d.fromBufferAttribute(position,ic).applyMatrix4(node.matrixWorld);
+            signedVolume += a.dot(b.clone().cross(d))/6;
+          }
+        });
+        if (!cancelled) setModelInfo({x:size.x,y:size.y,z:size.z,volume:Math.abs(signedVolume)/1000});
+      } catch (error) {
+        if (!cancelled) setFileError(error instanceof Error?error.message:"خواندن فایل ممکن نشد.");
+      }
+    }
+    inspectModel();
+    return () => {cancelled=true;};
+  }, [file]);
+
   const availableMaterials = useMemo(()=>materials.filter(m=>m.technology===technology),[materials,technology]);
   const values = (key:string) => options.filter(o=>o.key===key).map(o=>o.value);
   const infillOptions = values("infill");
   const layerOptions = values("layer_height");
   const nozzleOptions = values("nozzle_diameter");
   const colorOptions = values("color");
-  const supportOptions = values("supports");
+  const supportOptions = values("supports");\n  const compatibleMachines = machines.filter(m=>m.technology===technology);\n  const fitsMachine = modelInfo && compatibleMachines.some(m=>modelInfo.x<=m.build_x_mm && modelInfo.y<=m.build_y_mm && modelInfo.z<=m.build_z_mm);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const auth = sessionStorage.getItem("authHeader");
     if (!auth) { setMessage("برای ثبت سفارش ابتدا وارد حساب کاربری شوید."); return; }
-    if (!file) { setMessage("لطفاً فایل سه‌بعدی را انتخاب کنید."); return; }
+    if (!file) { setMessage("لطفاً فایل سه‌بعدی را انتخاب کنید."); return; }\n    if (fileError) { setMessage(fileError); return; }\n    if (modelInfo && compatibleMachines.length>0 && !fitsMachine) { setMessage("ابعاد فایل با دستگاه‌های فعال این تکنولوژی سازگار نیست."); return; }
     if (!material) { setMessage("ابتدا یک متریال فعال از فهرست انتخاب کنید."); return; }
     setBusy(true);
     const data = new FormData();
@@ -89,7 +136,7 @@ export default function OrderPage() {
           </div>
           {supportOptions.length>0&&<label className="field-label">ساپورت<select value={String(supports)} onChange={e=>setSupports(e.target.value==="true")}><option value="true" disabled={!supportOptions.includes("true")}>با ساپورت</option><option value="false" disabled={!supportOptions.includes("false")}>بدون ساپورت</option></select></label>}
         </div>
-        <div className="estimate-note"><ShieldCheck/><span><b>برآورد دقیق پس از بررسی</b><small>ابعاد، وزن و زمان چاپ توسط فرایند فنی تعیین می‌شود؛ امکان ورود دستی این مقادیر برای مشتری غیرفعال است.</small></span></div>
+        <div className="estimate-note"><ShieldCheck/><span><b>نمایش آنلاین ابعاد و بررسی ظرفیت دستگاه</b><small>ابعاد و حجم هندسی بلافاصله از فایل استخراج می‌شوند. وزن، زمان و مبلغ معتبر نیازمند اجرای Slicer با پروفایل واقعی دستگاه است؛ از نمایش عدد ساختگی خودداری می‌کنیم.</small></span></div>
         <button className="btn submit-order" disabled={busy}>{busy?"در حال ارسال...":"ارسال سفارش برای بررسی"} <ArrowRight size={18}/></button>
         <div role="status" className="form-message">{message} <a href="/login">ورود / ثبت‌نام</a></div>
       </form>
