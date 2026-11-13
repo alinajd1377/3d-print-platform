@@ -24,7 +24,6 @@ export default function OrderPage() {
   const [infill,setInfill] = useState("20");
   const [layer,setLayer] = useState("0.20");
   const [nozzle,setNozzle] = useState("0.40");
-  const [color,setColor] = useState("");
   const [supports,setSupports] = useState(true);
   const [quantity,setQuantity] = useState(1);
   const [message,setMessage] = useState("برای ثبت سفارش باید وارد حساب کاربری شوید.");
@@ -39,11 +38,11 @@ export default function OrderPage() {
       setOptions(data);
       const first = (key:string, fallback:string) => data.find(o=>o.key===key)?.value || fallback;
       setInfill(first("infill","20")); setLayer(first("layer_height","0.20"));
-      setNozzle(first("nozzle_diameter","0.40")); setColor(first("color",""));
+      setNozzle(first("nozzle_diameter","0.40"));
       const support = data.filter(o=>o.key==="supports").map(o=>o.value);
       if (support.length) setSupports(support.includes("true"));
     }).catch(()=>setOptions([]));
-    setMaterial(""); setColor("");
+    setMaterial("");
   }, [technology]);
   useEffect(() => {
     let cancelled = false;
@@ -98,7 +97,6 @@ export default function OrderPage() {
   const layerOptions = values("layer_height");
   const compatibleLayerOptions = layerOptions.filter(v=>Number(v)<=Number(nozzle)*0.75).sort((a,b)=>Number(a)-Number(b));
   const nozzleOptions = values("nozzle_diameter");
-  const colorOptions = values("color");
   const supportOptions = values("supports");
   const compatibleMachines = machines.filter(m=>m.technology===technology);
   const fitsMachine = modelInfo && compatibleMachines.some(m=>modelInfo.x<=m.build_x_mm && modelInfo.y<=m.build_y_mm && modelInfo.z<=m.build_z_mm);
@@ -120,7 +118,6 @@ export default function OrderPage() {
     if (supportOptions.length>0) data.append("supports",String(supports));
     data.append("quantity",String(quantity));
     if (modelInfo) { data.append("model_volume_cm3",String(modelInfo.volume)); data.append("model_height_mm",String(modelInfo.z)); }
-    if (color) data.append("color",color);
     try {
       const res = await fetch(`${API}/orders/`, {method:"POST",body:data,credentials:"include",headers:{Authorization:auth}});
       const body = await res.json().catch(()=>({}));
@@ -149,7 +146,6 @@ export default function OrderPage() {
           <div className="technology-choice"><button type="button" className={technology==="FDM"?"tech active":"tech"} onClick={()=>setTechnology("FDM")}><b>FDM</b><small>فیلامنتی</small></button><button type="button" className={technology==="RESIN"?"tech active":"tech"} onClick={()=>setTechnology("RESIN")}><b>RESIN</b><small>رزینی</small></button></div>
           <div className="form-grid">
             <label className="field-label">متریال<select required value={material} onChange={e=>setMaterial(e.target.value)}><option value="">انتخاب متریال</option>{availableMaterials.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
-            {colorOptions.length>0&&<label className="field-label">رنگ<select value={color} onChange={e=>setColor(e.target.value)}><option value="">انتخاب رنگ</option>{colorOptions.map((v,i)=><option key={`${v}-${i}`} value={v}>{v}</option>)}</select></label>}
             {infillOptions.length>0&&<label className="field-label">تراکم داخلی<select value={infill} onChange={e=>setInfill(e.target.value)}>{infillOptions.map((v,i)=><option key={`${v}-${i}`} value={v}>{v}٪</option>)}</select></label>}
             {layerOptions.length>0&&<label className="field-label">ارتفاع لایه (میلی‌متر)<select value={layer} onChange={e=>setLayer(e.target.value)}>{compatibleLayerOptions.map((v,i)=><option key={`${v}-${i}`} value={v}>{v}</option>)}</select></label>}
             {nozzleOptions.length>0&&<label className="field-label">قطر نازل (میلی‌متر)<select value={nozzle} onChange={e=>{const value=e.target.value;setNozzle(value);const valid=layerOptions.filter(v=>Number(v)<=Number(value)*0.75).sort((a,b)=>Number(a)-Number(b));if(valid.length&&Number(layer)>Number(value)*0.75)setLayer(valid[valid.length-1]);}}>{nozzleOptions.map((v,i)=><option key={`${v}-${i}`} value={v}>{v}</option>)}</select></label>}
