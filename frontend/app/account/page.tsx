@@ -23,8 +23,9 @@ export default function AccountPage() {
     const headers={Authorization:header};
     Promise.all([
       fetch(`${API}/profile/`,{headers}).then(r=>r.ok?r.json():null),
-      fetch(`${API}/orders/`,{headers}).then(r=>r.ok?r.json():[])
-    ]).then(([p,o])=>{if(p)setProfile(p);setOrders(Array.isArray(o)?o:(o.results||[]));})
+      fetch(`${API}/orders/`,{headers}).then(r=>r.ok?r.json():[]),
+      fetch(`${API}/store/orders/`,{headers}).then(r=>r.ok?r.json():[])
+    ]).then(([p,o,s])=>{if(p)setProfile(p);setOrders(Array.isArray(o)?o:(o.results||[]));setStoreOrders(Array.isArray(s)?s:[]);})
       .catch(()=>setMessage("دریافت اطلاعات با خطا مواجه شد."));
   },[]);
 
