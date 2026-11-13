@@ -55,8 +55,12 @@ export default function OrderPage() {
         const ext = file.name.toLowerCase().split(".").pop();
         const buffer = await file.arrayBuffer();
         let root: THREE.Object3D;
-        if (ext === "stl") root = new STLLoader().parse(buffer);
-        else if (ext === "obj") root = new OBJLoader().parse(await file.text());
+        if (ext === "stl") {
+          // STLLoader returns BufferGeometry, not an Object3D. Wrap it in a Mesh
+          // so bounds, transforms and traversal work consistently with OBJ/3MF.
+          const geometry = new STLLoader().parse(buffer);
+          root = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
+        } else if (ext === "obj") root = new OBJLoader().parse(await file.text());
         else if (ext === "3mf") root = new ThreeMFLoader().parse(buffer);
         else throw new Error("فرمت فایل پشتیبانی نمی‌شود.");
         root.updateMatrixWorld(true);
