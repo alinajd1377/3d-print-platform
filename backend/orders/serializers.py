@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from decimal import Decimal, InvalidOperation
 from .models import Material, Machine, PrintOption, PrintOrder
 
 
@@ -74,7 +75,14 @@ class PrintOrderSerializer(serializers.ModelSerializer):
             submitted_key = {"layer_height": "layer_height_mm", "nozzle_diameter": "nozzle_diameter_mm"}.get(key, key)
             if submitted_key in self.initial_data and not allowed:
                 raise serializers.ValidationError({key: "این گزینه هنوز توسط مدیر فعال نشده است."})
-            if allowed and value not in allowed:
+            matches = value in allowed
+            if key in ("layer_height", "nozzle_diameter") and allowed:
+                try:
+                    submitted_number = Decimal(value)
+                    matches = any(submitted_number == Decimal(str(candidate)) for candidate in allowed)
+                except (InvalidOperation, ValueError):
+                    matches = False
+            if allowed and not matches:
                 raise serializers.ValidationError({key: "این گزینه در حال حاضر فعال یا مجاز نیست."})
         return attrs
 
