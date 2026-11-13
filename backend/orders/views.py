@@ -11,7 +11,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from .models import Material, Machine, PricingRule, PrintOption, PrintOrder, Invoice, Payment
 from .serializers import MaterialSerializer, MachineSerializer, PrintOptionSerializer, PrintOrderSerializer
-from .pricing import estimate_price
+from .pricing import estimate_price, estimate_geometry
 from .zarinpal import request_payment, verify_payment
 
 class IsStaffOrReadOnly(permissions.BasePermission):
@@ -80,18 +80,35 @@ class OrderViewSet(viewsets.ModelViewSet):
                 float(value) for value in machine.nozzle_diameters
             }:
                 raise ValidationError({"nozzle_diameter_mm": "قطر نازل با دستگاه انتخاب‌شده سازگار نیست."})
-        # وزن و زمان از سمت مشتری پذیرفته نمی‌شوند؛ تا اتصال Slicer صفر می‌مانند.
-        weight = 0
-        hours = 0
-        qty = serializer.validated_data.get("quantity", 1)
+        volume = serializer.validated_data.get("model_volume_cm3", 0)
         infill = serializer.validated_data.get("infill_percent", 20)
         supports = serializer.validated_data.get("supports", True)
+        layer = serializer.validated_data.get("layer_height_mm", 0.20)
+        nozzle = serializer.validated_data.get("nozzle_diameter_mm", 0.40)
+        qty = serializer.validated_data.get("quantity", 1)
+
+        if serializer.validated_data["technology"] == "FDM":
+            weight, hours = estimate_geometry(
+                volume_cm3=volume,
+                density_g_cm3=material.density_g_cm3,
+                infill_percent=infill,
+                nozzle_mm=nozzle,
+                layer_mm=layer,
+                machine=machine,
+            )
+        else:
+            # رزین به‌صورت حجم جامد تخمین زده می‌شود؛ زمان چاپ رزینی به زمان نوردهی/پروفایل نیاز دارد.
+            from decimal import Decimal
+            weight = (Decimal(str(volume or 0)) * Decimal(str(material.density_g_cm3))).quantize(Decimal("0.01"))
+            hours = Decimal("0")
+
         rule = PricingRule.objects.filter(is_active=True).order_by("id").first()
         price = estimate_price(material=material, machine=machine, weight_g=weight,
                                hours=hours, infill_percent=infill, supports=supports,
                                quantity=qty, rule=rule)
         serializer.save(customer=self.request.user, machine=machine,
-                        estimated_price_toman=price,
+                        model_volume_cm3=volume, estimated_weight_g=weight,
+                        estimated_hours=hours, estimated_price_toman=price,
                         original_filename=uploaded.name if uploaded else "")
 
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
