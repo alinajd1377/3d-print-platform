@@ -10,7 +10,7 @@ export default function Home() {
   return <>
     <header className="topbar"><div className="container nav">
       <a className="logo" href="/"><span className="logo-mark"><Box size={21}/></span> پرینت‌یار <small>3D PRINT</small></a>
-      <nav className="navlinks"><a href="#services">خدمات</a><a href="/store">فروشگاه</a><a href="#steps">مراحل سفارش</a><a href="#why">چرا ما؟</a></nav>
+      <nav className="navlinks"><a href="#services">خدمات</a><a href="/store">فروشگاه</a><a href="/account">حساب کاربری</a><a href="#steps">مراحل سفارش</a><a href="#why">چرا ما؟</a></nav>
       <a className="btn nav-cta" href="/order">ثبت سفارش <ArrowLeft size={17}/></a>
     </div></header>
     <main>
