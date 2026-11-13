@@ -92,6 +92,7 @@ export default function OrderPage() {
   const values = (key:string) => options.filter(o=>o.key===key).map(o=>o.value);
   const infillOptions = values("infill");
   const layerOptions = values("layer_height");
+  const compatibleLayerOptions = layerOptions.filter(v=>Number(v)<=Number(nozzle)*0.75).sort((a,b)=>Number(a)-Number(b));
   const nozzleOptions = values("nozzle_diameter");
   const colorOptions = values("color");
   const supportOptions = values("supports");
@@ -146,8 +147,8 @@ export default function OrderPage() {
             <label className="field-label">متریال<select required value={material} onChange={e=>setMaterial(e.target.value)}><option value="">انتخاب متریال</option>{availableMaterials.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
             {colorOptions.length>0&&<label className="field-label">رنگ<select value={color} onChange={e=>setColor(e.target.value)}><option value="">انتخاب رنگ</option>{colorOptions.map((v,i)=><option key={`${v}-${i}`} value={v}>{v}</option>)}</select></label>}
             {infillOptions.length>0&&<label className="field-label">تراکم داخلی<select value={infill} onChange={e=>setInfill(e.target.value)}>{infillOptions.map((v,i)=><option key={`${v}-${i}`} value={v}>{v}٪</option>)}</select></label>}
-            {layerOptions.length>0&&<label className="field-label">ارتفاع لایه (میلی‌متر)<select value={layer} onChange={e=>setLayer(e.target.value)}>{layerOptions.map((v,i)=><option key={`${v}-${i}`} value={v}>{v}</option>)}</select></label>}
-            {nozzleOptions.length>0&&<label className="field-label">قطر نازل (میلی‌متر)<select value={nozzle} onChange={e=>setNozzle(e.target.value)}>{nozzleOptions.map((v,i)=><option key={`${v}-${i}`} value={v}>{v}</option>)}</select></label>}
+            {layerOptions.length>0&&<label className="field-label">ارتفاع لایه (میلی‌متر)<select value={layer} onChange={e=>setLayer(e.target.value)}>{compatibleLayerOptions.map((v,i)=><option key={`${v}-${i}`} value={v}>{v}</option>)}</select></label>}
+            {nozzleOptions.length>0&&<label className="field-label">قطر نازل (میلی‌متر)<select value={nozzle} onChange={e=>{const value=e.target.value;setNozzle(value);const valid=layerOptions.filter(v=>Number(v)<=Number(value)*0.75).sort((a,b)=>Number(a)-Number(b));if(valid.length&&Number(layer)>Number(value)*0.75)setLayer(valid[valid.length-1]);}}>{nozzleOptions.map((v,i)=><option key={`${v}-${i}`} value={v}>{v}</option>)}</select></label>}
             <label className="field-label">تعداد قطعه<input type="number" min="1" max="100" value={quantity} onChange={e=>setQuantity(Math.max(1,Math.min(100,+e.target.value||1)))}/></label>
           </div>
           {supportOptions.length>0&&<label className="field-label">ساپورت<select value={String(supports)} onChange={e=>setSupports(e.target.value==="true")}><option value="true" disabled={!supportOptions.includes("true")}>با ساپورت</option><option value="false" disabled={!supportOptions.includes("false")}>بدون ساپورت</option></select></label>}
