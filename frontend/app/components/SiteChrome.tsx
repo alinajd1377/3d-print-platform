@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Phone, Mail, MapPin, Clock3, Instagram, Send, MessageCircle, AtSign, ExternalLink } from "lucide-react";
+import { Phone, Mail, MapPin, Clock3, Instagram, Send, MessageCircle, AtSign } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 type Settings = {site_name:string;contact_phone:string;contact_email:string;telegram_url:string;bale_url:string;instagram_url:string;x_url:string;whatsapp_url:string;contact_address:string;working_hours:string};
