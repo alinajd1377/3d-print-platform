@@ -25,6 +25,8 @@ class Machine(models.Model):
     min_layer_height_mm = models.DecimalField(max_digits=5, decimal_places=3, default=0.080)
     max_layer_height_mm = models.DecimalField(max_digits=5, decimal_places=3, default=0.400)
     max_print_speed_mm_s = models.PositiveSmallIntegerField(default=0)
+    resin_exposure_seconds_per_layer = models.DecimalField(max_digits=5, decimal_places=2, default=8.00)
+    resin_lift_seconds_per_layer = models.DecimalField(max_digits=5, decimal_places=2, default=3.00)
     supported_materials = models.ManyToManyField("Material", blank=True, related_name="compatible_machines")
     slicer_profile = models.CharField(max_length=255, blank=True, help_text="مسیر/شناسه پروفایل؛ فایل اجرایی در این فاز اجرا نمی‌شود")
     def __str__(self): return self.name
