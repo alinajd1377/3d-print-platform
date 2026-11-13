@@ -24,7 +24,9 @@ export default function LoginPage() {
       });
       const data = await response.json().catch(()=>({}));
       if (!response.ok) { setMessage(data.detail || "ورود یا ثبت‌نام انجام نشد."); return; }
-      const bytes = new TextEncoder().encode(mobile + ":" + password);\n      const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join("");\n      sessionStorage.setItem("authHeader", "Basic " + btoa(binary));
+      const bytes = new TextEncoder().encode(mobile + ":" + password);
+      const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join("");
+      sessionStorage.setItem("authHeader", "Basic " + btoa(binary));
       router.push("/account");
     } catch { setMessage("ارتباط با سرور برقرار نشد."); }
     finally { setBusy(false); }
