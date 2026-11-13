@@ -5,13 +5,13 @@ import { ArrowRight, ShoppingBag, PackageCheck } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 type Variant = { id:number; color:string; price_toman:number; stock:number };
-type Product = { id:number; title:string; slug:string; description:string; variants:Variant[] };
+type Product = { id:number; title:string; slug:string; description:string; variants:Variant[]; images:{url:string;alt_text:string}[] };
 
 const toman = (value:number) => new Intl.NumberFormat("fa-IR").format(value) + " تومان";
 
 export default function StorePage() {
   const [products,setProducts] = useState<Product[]>([]);
-  const [busy,setBusy] = useState<number|null>(null);
+  const [busy,setBusy] = useState<number|null>(null);\n  const [quantities,setQuantities] = useState<Record<number,number>>({});
   const [message,setMessage] = useState("برای ثبت سفارش کالا، ابتدا باید وارد حساب کاربری شوید.");
   useEffect(() => {
     fetch(`${API}/store/products/`).then(r=>r.ok?r.json():[]).then(setProducts).catch(()=>setMessage("دریافت محصولات با خطا مواجه شد."));
@@ -22,7 +22,7 @@ export default function StorePage() {
     try {
       const response = await fetch(`${API}/store/orders/`, {
         method:"POST", credentials:"include", headers:{"Content-Type":"application/json",Authorization:sessionStorage.getItem("authHeader")||""},
-        body:JSON.stringify({variant_id:variantId,quantity:1})
+        body:JSON.stringify({variant_id:variantId,quantity:quantities[variantId]||1})
       });
       const result = await response.json().catch(()=>({}));
       if (response.status===401 || response.status===403) setMessage("برای ثبت سفارش ابتدا باید وارد حساب کاربری شوید.");
@@ -37,7 +37,7 @@ export default function StorePage() {
     <header className="store-heading"><span className="section-kicker">فروشگاه قطعات آماده</span><h1>محصولات آماده پرینت‌یار</h1><p>محصول را انتخاب کن و رنگ و موجودی هر گزینه را ببین.</p></header>
     {products.length===0 ? <div className="store-empty"><ShoppingBag size={32}/><b>هنوز محصولی برای نمایش ثبت نشده است.</b><span>مدیر سایت می‌تواند محصولات را از پنل مدیریت اضافه کند.</span></div> :
       <div className="store-grid">{products.map(product=><article className="store-card" key={product.id}>
-        <div className="store-art"><PackageCheck size={42}/></div>
+        <div className="store-art">{product.images?.[0]?.url?<img src={product.images[0].url} alt={product.images[0].alt_text||product.title}/>:<PackageCheck size={42}/>}</div>
         <h2>{product.title}</h2><p>{product.description}</p>
         <div className="variant-list">{product.variants.map(v=><div className="variant-row" key={v.id}>
           <span>{v.color}<small>{v.stock>0?`موجودی: ${v.stock}`:"ناموجود / نیازمند هماهنگی"}</small></span>
