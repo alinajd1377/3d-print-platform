@@ -52,6 +52,5 @@ export default function Home() {
         <div className="why-list"><div><ShieldCheck/><span><b>کنترل کیفیت فنی</b><small>بررسی فایل و سازگاری تنظیمات پیش از تولید</small></span></div><div><Clock3/><span><b>شفافیت در وضعیت سفارش</b><small>پیگیری مراحل از پنل کاربری</small></span></div><div><PackageCheck/><span><b>اطلاع‌رسانی تا تحویل</b><small>نمایش وضعیت آماده‌سازی و ارسال</small></span></div></div>
       </div></section>
     </main>
-    <footer className="footer"><div className="container footer-inner"><a className="logo" href="/">پرینت‌یار <small>3D PRINT</small></a><span>© پرینت‌یار — سامانه سفارش آنلاین چاپ سه‌بعدی</span></div></footer>
   </>;
 }
