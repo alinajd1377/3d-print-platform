@@ -7,6 +7,7 @@ import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { ThreeMFLoader } from "three/examples/jsm/loaders/3MFLoader.js";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+function csrfToken(){return document.cookie.split("; ").find(row=>row.startsWith("csrftoken="))?.split("=")[1]||"";}
 type Material = { id:number; name:string; technology:"FDM"|"RESIN"; price_per_gram_toman:number };
 type Option = { id:number; key:string; label:string; value:string; technology:string };
 type Machine = {id:number;name:string;technology:string;build_x_mm:number;build_y_mm:number;build_z_mm:number};
@@ -103,8 +104,7 @@ export default function OrderPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const auth = sessionStorage.getItem("authHeader");
-    if (!auth) { setMessage("برای ثبت سفارش ابتدا وارد حساب کاربری شوید."); return; }
+
     if (!file) { setMessage("لطفاً فایل سه‌بعدی را انتخاب کنید."); return; }
     if (fileError) { setMessage(fileError); return; }
     if (modelInfo && compatibleMachines.length>0 && !fitsMachine) { setMessage("ابعاد فایل با دستگاه‌های فعال این تکنولوژی سازگار نیست."); return; }
@@ -119,9 +119,9 @@ export default function OrderPage() {
     data.append("quantity",String(quantity));
     if (modelInfo) { data.append("model_volume_cm3",String(modelInfo.volume)); data.append("model_height_mm",String(modelInfo.z)); }
     try {
-      const res = await fetch(`${API}/orders/`, {method:"POST",body:data,credentials:"include",headers:{Authorization:auth}});
+      const res = await fetch(`${API}/orders/`, {method:"POST",body:data,credentials:"include",headers:{"X-CSRFToken":decodeURIComponent(csrfToken())}});
       const body = await res.json().catch(()=>({}));
-      if (res.status === 401 || res.status === 403) setMessage("برای ثبت سفارش ابتدا باید وارد حساب کاربری شوید. ورود با شماره موبایل در مرحله بعد تکمیل می‌شود.");
+      if (res.status === 401 || res.status === 403) setMessage("نشست ورود شما معتبر نیست یا منقضی شده است؛ دوباره وارد حساب شوید.");
       else if (!res.ok) setMessage(body.detail || "ثبت سفارش انجام نشد؛ اطلاعات و اتصال API را بررسی کنید.");
       else {
         const estimate = `وزن تخمینی: ${Number(body.estimated_weight_g||0).toFixed(2)} گرم | زمان تخمینی: ${Number(body.estimated_hours||0).toFixed(2)} ساعت | مبلغ اولیه: ${Number(body.estimated_price_toman||0).toLocaleString("fa-IR")} تومان`;
