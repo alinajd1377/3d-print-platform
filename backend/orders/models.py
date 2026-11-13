@@ -219,3 +219,16 @@ class SiteSettings(models.Model):
 
     def __str__(self):
         return "تنظیمات سایت"
+
+
+class ProductImage(models.Model):
+    product = models.ForeignKey(StoreProduct, on_delete=models.CASCADE, related_name="images")
+    image = models.ImageField(upload_to="store/products/%Y/%m/")
+    alt_text = models.CharField(max_length=180, blank=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ("sort_order", "id")
+
+    def __str__(self):
+        return self.alt_text or f"تصویر {self.product.title}"
