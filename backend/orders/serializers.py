@@ -32,7 +32,7 @@ class PrintOrderSerializer(serializers.ModelSerializer):
         fields = (
             "public_id", "file", "original_filename", "technology", "material",
             "material_name", "machine", "color", "infill_percent", "layer_height_mm",
-            "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "estimated_weight_g", "estimated_hours",
+            "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "model_height_mm", "estimated_weight_g", "estimated_hours",
             "estimated_price_toman", "final_price_toman", "admin_note", "status",
             "created_at",
         )
