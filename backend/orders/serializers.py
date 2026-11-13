@@ -92,14 +92,23 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
 class StoreProductSerializer(serializers.ModelSerializer):
     variants = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
 
     class Meta:
         model = StoreProduct
-        fields = ("id", "title", "slug", "description", "variants")
+        fields = ("id", "title", "slug", "description", "variants", "images")
 
     def get_variants(self, obj):
         qs = obj.variants.filter(is_active=True)
         return ProductVariantSerializer(qs, many=True).data
+
+    def get_images(self, obj):
+        request = self.context.get("request")
+        result = []
+        for item in obj.images.all():
+            url = item.image.url
+            result.append({"url": request.build_absolute_uri(url) if request else url, "alt_text": item.alt_text})
+        return result
 
 
 class StoreOrderCreateSerializer(serializers.Serializer):
