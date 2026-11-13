@@ -34,8 +34,8 @@ def estimate_price(*, material, machine, weight_g, hours, infill_percent, suppor
     setup = machine.setup_fee_toman if machine else 0
 
     support_factor = (
-        Decimal(str(rule.support_multiplier)) if rule
-        else (Decimal("1.12") if supports else Decimal("1.00"))
+        Decimal(str(rule.support_multiplier)) if rule and supports
+        else (Decimal("1.00") if rule else (Decimal("1.12") if supports else Decimal("1.00")))
     )
     infill_factor = Decimal(str(rule.infill_multiplier)) if rule else Decimal("1.00")
 
