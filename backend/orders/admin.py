@@ -132,3 +132,59 @@ class InvoiceAdmin(admin.ModelAdmin):
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
     list_display = ("id", "invoice", "amount_toman", "status", "authority", "ref_id")
+
+
+from .models import CustomerProfile, StoreProduct, ProductVariant, StoreOrder, StoreOrderItem, SiteSettings
+
+
+@admin.register(CustomerProfile)
+class CustomerProfileAdmin(admin.ModelAdmin):
+    list_display = ("mobile", "full_name", "postal_code", "updated_at")
+    search_fields = ("mobile", "full_name", "user__username")
+
+
+class ProductVariantInline(admin.TabularInline):
+    model = ProductVariant
+    extra = 1
+
+
+@admin.register(StoreProduct)
+class StoreProductAdmin(admin.ModelAdmin):
+    list_display = ("title", "slug", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("title", "description")
+    prepopulated_fields = {"slug": ("title",)}
+    inlines = (ProductVariantInline,)
+
+
+@admin.register(ProductVariant)
+class ProductVariantAdmin(admin.ModelAdmin):
+    list_display = ("product", "color", "price_toman", "stock", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("product__title", "color", "sku")
+
+
+class StoreOrderItemInline(admin.TabularInline):
+    model = StoreOrderItem
+    extra = 0
+    readonly_fields = ("variant", "quantity", "unit_price_toman")
+
+
+@admin.register(StoreOrder)
+class StoreOrderAdmin(admin.ModelAdmin):
+    list_display = ("id", "customer", "status", "total_toman", "created_at")
+    list_filter = ("status",)
+    search_fields = ("customer__username", "customer__customer_profile__mobile")
+    inlines = (StoreOrderItemInline,)
+
+
+@admin.register(SiteSettings)
+class SiteSettingsAdmin(admin.ModelAdmin):
+    fieldsets = (
+        ("مشخصات", {"fields": ("site_name", "contact_phone", "contact_email", "contact_address", "working_hours")}),
+        ("شبکه‌های اجتماعی", {"fields": ("telegram_url", "bale_url", "instagram_url", "whatsapp_url")}),
+        ("نشان‌ها و پرداخت", {"fields": ("enamad_image_url", "payment_logo_url", "payment_enabled")}),
+    )
+
+    def has_add_permission(self, request):
+        return not SiteSettings.objects.exists()
