@@ -79,6 +79,7 @@ class PrintOrder(models.Model):
     supports = models.BooleanField(default=True)
     quantity = models.PositiveSmallIntegerField(default=1)
     model_volume_cm3 = models.DecimalField(max_digits=10, decimal_places=3, default=0, help_text="حجم هندسی استخراج‌شده از فایل؛ برآورد اولیه و نه نتیجه اسلایسر")
+    model_height_mm = models.DecimalField(max_digits=8, decimal_places=2, default=0, help_text="ارتفاع هندسی مدل بر حسب میلی‌متر")
     estimated_weight_g = models.DecimalField(max_digits=9, decimal_places=2, default=0)
     estimated_hours = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     estimated_price_toman = models.PositiveIntegerField(default=0)
