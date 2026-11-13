@@ -134,13 +134,18 @@ class PaymentAdmin(admin.ModelAdmin):
     list_display = ("id", "invoice", "amount_toman", "status", "authority", "ref_id")
 
 
-from .models import CustomerProfile, StoreProduct, ProductVariant, StoreOrder, StoreOrderItem, SiteSettings
+from .models import CustomerProfile, StoreProduct, ProductVariant, StoreOrder, StoreOrderItem, SiteSettings, ProductImage
 
 
 @admin.register(CustomerProfile)
 class CustomerProfileAdmin(admin.ModelAdmin):
     list_display = ("mobile", "full_name", "postal_code", "updated_at")
     search_fields = ("mobile", "full_name", "user__username")
+
+
+class ProductImageInline(admin.TabularInline):
+    model = ProductImage
+    extra = 1
 
 
 class ProductVariantInline(admin.TabularInline):
@@ -154,7 +159,7 @@ class StoreProductAdmin(admin.ModelAdmin):
     list_filter = ("is_active",)
     search_fields = ("title", "description")
     prepopulated_fields = {"slug": ("title",)}
-    inlines = (ProductVariantInline,)
+    inlines = (ProductVariantInline, ProductImageInline)
 
 
 @admin.register(ProductVariant)
