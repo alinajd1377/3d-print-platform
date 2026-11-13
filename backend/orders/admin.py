@@ -1,0 +1,134 @@
+from django.contrib import admin
+from django import forms
+from .models import (
+    Material, Machine, PricingRule, PrintOption, PrintOrder,
+    OrderRevision, Invoice, Payment,
+)
+from .pricing import estimate_price
+
+
+@admin.register(Material)
+class MaterialAdmin(admin.ModelAdmin):
+    list_display = ("name", "technology", "price_per_gram_toman", "is_active")
+    list_filter = ("technology", "is_active")
+    list_editable = ("price_per_gram_toman", "is_active")
+    search_fields = ("name",)
+
+
+@admin.register(Machine)
+class MachineAdmin(admin.ModelAdmin):
+    list_display = ("name", "technology", "hourly_rate_toman", "setup_fee_toman", "is_active")
+    list_filter = ("technology", "is_active")
+    filter_horizontal = ("supported_materials",)
+    fieldsets = (
+        ("اطلاعات پایه", {"fields": ("name", "technology", "is_active")}),
+        ("تعرفه", {"fields": ("hourly_rate_toman", "setup_fee_toman")}),
+        ("محدوده چاپ (میلی‌متر)", {"fields": ("build_x_mm", "build_y_mm", "build_z_mm")}),
+        ("محدودیت‌های فنی", {"fields": ("nozzle_diameters", "min_layer_height_mm",
+                                      "max_layer_height_mm", "max_print_speed_mm_s",
+                                      "supported_materials", "slicer_profile")}),
+    )
+
+
+@admin.register(PrintOption)
+class PrintOptionAdmin(admin.ModelAdmin):
+    list_display = ("label", "technology", "key", "value", "is_active", "sort_order")
+    list_filter = ("technology", "is_active", "key")
+    list_editable = ("value", "is_active", "sort_order")
+    search_fields = ("label", "key", "value")
+
+
+@admin.register(PricingRule)
+class PricingRuleAdmin(admin.ModelAdmin):
+    list_display = ("name", "support_multiplier", "infill_multiplier", "minimum_order_toman", "is_active")
+    list_editable = ("support_multiplier", "infill_multiplier", "minimum_order_toman", "is_active")
+
+
+class PrintOrderAdminForm(forms.ModelForm):
+    revision_reason = forms.CharField(
+        label="دلیل تغییر سفارش (برای ثبت در تاریخچه)",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
+
+    class Meta:
+        model = PrintOrder
+        fields = "__all__"
+
+
+class OrderRevisionInline(admin.TabularInline):
+    model = OrderRevision
+    extra = 0
+    can_delete = False
+    readonly_fields = ("created_at", "changed_by", "reason", "snapshot")
+    fields = ("created_at", "changed_by", "reason", "snapshot")
+    ordering = ("-created_at",)
+
+
+@admin.register(PrintOrder)
+class PrintOrderAdmin(admin.ModelAdmin):
+    form = PrintOrderAdminForm
+    list_display = ("public_id", "customer", "technology", "material", "machine",
+                    "status", "estimated_price_toman", "final_price_toman", "created_at")
+    list_filter = ("status", "technology", "material")
+    search_fields = ("public_id", "customer__username", "customer__email", "original_filename")
+    readonly_fields = ("public_id", "created_at", "updated_at", "original_filename")
+    inlines = (OrderRevisionInline,)
+    fieldsets = (
+        ("مشتری و فایل", {"fields": ("public_id", "customer", "file", "original_filename")}),
+        ("تنظیمات چاپ (قابل ویرایش مدیر)", {"fields": (
+            "technology", "material", "machine", "color", "infill_percent",
+            "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity")}),
+        ("برآورد و مبلغ نهایی", {"fields": (
+            "estimated_weight_g", "estimated_hours", "estimated_price_toman",
+            "final_price_toman")}),
+        ("وضعیت و یادداشت", {"fields": ("status", "admin_note", "revision_reason", "created_at", "updated_at")}),
+    )
+
+    def save_model(self, request, obj, form, change):
+        if change:
+            old = PrintOrder.objects.get(pk=obj.pk)
+            fields = ("technology", "material_id", "machine_id", "color", "infill_percent",
+                      "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity", "estimated_weight_g",
+                      "estimated_hours", "estimated_price_toman", "final_price_toman",
+                      "status", "admin_note", "file")
+            before = {}
+            for field in fields:
+                value = getattr(old, field)
+                before[field] = str(value) if value is not None else None
+        # پس از تغییر تنظیمات فنی، برآورد دوباره با تعرفه فعلی محاسبه می‌شود.
+        rule = PricingRule.objects.filter(is_active=True).order_by("id").first()
+        obj.estimated_price_toman = estimate_price(
+            material=obj.material, machine=obj.machine,
+            weight_g=obj.estimated_weight_g, hours=obj.estimated_hours,
+            infill_percent=obj.infill_percent, supports=obj.supports,
+            quantity=obj.quantity, rule=rule,
+        )
+        super().save_model(request, obj, form, change)
+        if change:
+            OrderRevision.objects.create(
+                order=obj, changed_by=request.user,
+                reason=request.POST.get("revision_reason", "").strip(),
+                snapshot={"before": before, "after": {
+                    field: str(getattr(obj, field)) if getattr(obj, field) is not None else None
+                    for field in fields
+                }},
+            )
+
+
+@admin.register(OrderRevision)
+class OrderRevisionAdmin(admin.ModelAdmin):
+    list_display = ("order", "changed_by", "created_at")
+    readonly_fields = ("order", "snapshot", "changed_by", "reason", "created_at")
+    def has_add_permission(self, request): return False
+    def has_change_permission(self, request, obj=None): return False
+
+
+@admin.register(Invoice)
+class InvoiceAdmin(admin.ModelAdmin):
+    list_display = ("id", "order", "amount_toman", "is_paid", "created_at")
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ("id", "invoice", "amount_toman", "status", "authority", "ref_id")

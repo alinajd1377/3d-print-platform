@@ -1,0 +1,74 @@
+from rest_framework import serializers
+from .models import Material, Machine, PrintOption, PrintOrder
+
+
+class MaterialSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Material
+        fields = ("id", "name", "technology", "price_per_gram_toman")
+
+
+class MachineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Machine
+        fields = ("id", "name", "technology", "hourly_rate_toman", "setup_fee_toman",
+                  "build_x_mm", "build_y_mm", "build_z_mm", "nozzle_diameters",
+                  "min_layer_height_mm", "max_layer_height_mm")
+
+
+class PrintOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PrintOption
+        fields = ("id", "technology", "key", "label", "value", "sort_order")
+
+
+class PrintOrderSerializer(serializers.ModelSerializer):
+    material_name = serializers.CharField(source="material.name", read_only=True)
+
+    class Meta:
+        model = PrintOrder
+        fields = (
+            "public_id", "file", "original_filename", "technology", "material",
+            "material_name", "machine", "color", "infill_percent", "layer_height_mm",
+            "nozzle_diameter_mm", "supports", "quantity", "estimated_weight_g", "estimated_hours",
+            "estimated_price_toman", "final_price_toman", "admin_note", "status",
+            "created_at",
+        )
+        read_only_fields = (
+            "public_id", "machine", "estimated_weight_g", "estimated_hours",
+            "estimated_price_toman", "final_price_toman", "admin_note",
+            "status", "created_at", "original_filename",
+        )
+
+    def validate(self, attrs):
+        technology = attrs.get("technology", getattr(self.instance, "technology", None))
+        material = attrs.get("material", getattr(self.instance, "material", None))
+        machine = attrs.get("machine", getattr(self.instance, "machine", None))
+        if material and not material.is_active:
+            raise serializers.ValidationError({"material": "این متریال در حال حاضر غیرفعال است."})
+        if material and technology and material.technology != technology:
+            raise serializers.ValidationError({"material": "این ماده با تکنولوژی انتخاب‌شده سازگار نیست."})
+        if machine and technology and machine.technology != technology:
+            raise serializers.ValidationError({"machine": "این دستگاه با تکنولوژی سفارش سازگار نیست."})
+        if machine and material and machine.supported_materials.exists() and not machine.supported_materials.filter(pk=material.pk).exists():
+            raise serializers.ValidationError({"material": "این دستگاه از ماده انتخاب‌شده پشتیبانی نمی‌کند."})
+        checks = {
+            "infill": str(attrs.get("infill_percent", getattr(self.instance, "infill_percent", ""))),
+            "layer_height": str(attrs.get("layer_height_mm", getattr(self.instance, "layer_height_mm", ""))),
+            "color": str(attrs.get("color", getattr(self.instance, "color", ""))),
+            "supports": str(attrs.get("supports", getattr(self.instance, "supports", ""))).lower(),
+            "nozzle_diameter": str(attrs.get("nozzle_diameter_mm", getattr(self.instance, "nozzle_diameter_mm", ""))),
+        }
+        for key, value in checks.items():
+            if value in ("", "none"):
+                continue
+            allowed = PrintOption.objects.filter(
+                technology=technology, key=key, is_active=True
+            ).values_list("value", flat=True)
+            allowed = list(allowed)
+            submitted_key = {"layer_height": "layer_height_mm", "nozzle_diameter": "nozzle_diameter_mm"}.get(key, key)
+            if submitted_key in self.initial_data and not allowed:
+                raise serializers.ValidationError({key: "این گزینه هنوز توسط مدیر فعال نشده است."})
+            if allowed and value not in allowed:
+                raise serializers.ValidationError({key: "این گزینه در حال حاضر فعال یا مجاز نیست."})
+        return attrs
