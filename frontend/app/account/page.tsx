@@ -56,6 +56,9 @@ export default function AccountPage() {
       <section className="account-panel"><h2><ClipboardList size={19}/> سفارش‌های چاپ من</h2>
         {orders.length===0?<p className="account-muted">هنوز سفارش چاپی ثبت نشده است.</p>:<div className="account-orders">{orders.map(o=><article key={o.public_id}><div><b>{o.material_name} · {o.technology}</b><small>{new Date(o.created_at).toLocaleDateString("fa-IR")}</small></div><span>{statusNames[o.status]||o.status}</span><strong>{o.final_price_toman?new Intl.NumberFormat("fa-IR").format(o.final_price_toman)+" تومان":"در انتظار قیمت نهایی"}</strong></article>)}</div>}
       </section>
+      <section className="account-panel"><h2><ClipboardList size={19}/> سفارش‌های فروشگاه</h2>
+        {storeOrders.length===0?<p className="account-muted">هنوز سفارش کالای آماده‌ای ثبت نشده است.</p>:<div className="account-orders">{storeOrders.map(o=><article key={o.id}><div><b>{o.items.map(i=>i.product+" · "+i.color+" × "+i.quantity).join("، ")}</b><small>{new Date(o.created_at).toLocaleDateString("fa-IR")}</small></div><span>{o.status==="COORDINATION"?"نیازمند هماهنگی موجودی":o.status==="PENDING"?"در انتظار بررسی":o.status}</span><strong>{new Intl.NumberFormat("fa-IR").format(o.total_toman)} تومان</strong></article>)}</div>}
+      </section>
     </>}
   </div></main>;
 }
