@@ -35,5 +35,6 @@ export default function SiteChrome() {
       </div>
     </div>
     <div className="global-footer-bottom">© {new Date().getFullYear()} {settings?.site_name||"پرینت‌یار"} — تمامی حقوق محفوظ است</div>
-  </footer>;
+  </footer>
+  </>;
 }
