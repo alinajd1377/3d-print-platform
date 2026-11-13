@@ -120,5 +120,5 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = SiteSettings
         fields = ("site_name", "contact_phone", "contact_email", "telegram_url", "bale_url",
-                  "instagram_url", "whatsapp_url", "contact_address", "working_hours",
+                  "instagram_url", "x_url", "whatsapp_url", "contact_address", "working_hours",
                   "enamad_image_url", "payment_logo_url", "payment_enabled")
