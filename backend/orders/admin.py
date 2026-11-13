@@ -9,9 +9,9 @@ from .pricing import estimate_price
 
 @admin.register(Material)
 class MaterialAdmin(admin.ModelAdmin):
-    list_display = ("name", "technology", "price_per_gram_toman", "is_active")
+    list_display = ("name", "technology", "price_per_gram_toman", "density_g_cm3", "is_active")
     list_filter = ("technology", "is_active")
-    list_editable = ("price_per_gram_toman", "is_active")
+    list_editable = ("price_per_gram_toman", "density_g_cm3", "is_active")
     search_fields = ("name",)
 
 
@@ -78,7 +78,7 @@ class PrintOrderAdmin(admin.ModelAdmin):
         ("مشتری و فایل", {"fields": ("public_id", "customer", "file", "original_filename")}),
         ("تنظیمات چاپ (قابل ویرایش مدیر)", {"fields": (
             "technology", "material", "machine", "color", "infill_percent",
-            "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity")}),
+            "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3")}),
         ("برآورد و مبلغ نهایی", {"fields": (
             "estimated_weight_g", "estimated_hours", "estimated_price_toman",
             "final_price_toman")}),
