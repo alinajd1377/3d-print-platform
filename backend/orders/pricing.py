@@ -39,8 +39,8 @@ def estimate_price(*, material, machine, weight_g, hours, infill_percent, suppor
     )
     infill_factor = Decimal(str(rule.infill_multiplier)) if rule else Decimal("1.00")
 
-    subtotal = (material_cost + machine_cost) * support_factor * infill_factor + setup
-    total = int((subtotal * quantity).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    per_piece = (material_cost + machine_cost) * support_factor * infill_factor
+    total = int((per_piece * quantity + setup).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     if rule:
         total = max(total, rule.minimum_order_toman)
     return total
