@@ -117,7 +117,7 @@ export default function OrderPage() {
           method:"POST", credentials:"include",
           headers:{"Content-Type":"application/json","X-CSRFToken":token},
           body:JSON.stringify((()=>{
-            const payload:Record<string,unknown> = {technology,material,quantity,model_volume_cm3:modelInfo.volume,model_height_mm:modelInfo.z};
+            const payload:Record<string,unknown> = {technology,material,quantity,model_volume_cm3:Number(modelInfo.volume.toFixed(3)),model_height_mm:Number(modelInfo.z.toFixed(2))};
             if (infillOptions.length>0) payload.infill_percent=Number(infill);
             if (layerOptions.length>0) payload.layer_height_mm=Number(layer);
             if (nozzleOptions.length>0) payload.nozzle_diameter_mm=Number(nozzle);
@@ -157,7 +157,7 @@ export default function OrderPage() {
     if (nozzleOptions.length>0) data.append("nozzle_diameter_mm",nozzle);
     if (supportOptions.length>0) data.append("supports",String(supports));
     data.append("quantity",String(quantity));
-    if (modelInfo) { data.append("model_volume_cm3",String(modelInfo.volume)); data.append("model_height_mm",String(modelInfo.z)); }
+    if (modelInfo) { data.append("model_volume_cm3",modelInfo.volume.toFixed(3)); data.append("model_height_mm",modelInfo.z.toFixed(2)); }
     try {
       const res = await fetch(`${API}/orders/`, {method:"POST",body:data,credentials:"include",headers:{"X-CSRFToken":decodeURIComponent(csrfToken())}});
       const body = await res.json().catch(()=>({}));
