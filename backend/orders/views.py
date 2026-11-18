@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.middleware.csrf import get_token
+from django.http import JsonResponse
 from rest_framework import permissions, status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action, api_view, permission_classes
@@ -399,3 +400,9 @@ class MobileAuthView(APIView):
             return Response({"detail": "شماره موبایل یا رمز عبور صحیح نیست."}, status=400)
         auth_login(request, user)
         return Response({"authenticated": True, "mobile": mobile})
+
+
+@ensure_csrf_cookie
+def csrf_bootstrap(request):
+    """Issue a CSRF cookie and return its masked token for browser clients."""
+    return JsonResponse({"csrfToken": get_token(request)})
