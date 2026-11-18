@@ -18,8 +18,16 @@ export default function LoginPage() {
   async function submit(e:FormEvent) {
     e.preventDefault(); setBusy(true); setMessage("");
     try {
+      // First obtain a CSRF token and cookie from Django, then send it with the login POST.
+      const csrfResponse = await fetch(`${API}/auth/mobile/`, { method:"GET", credentials:"include" });
+      const csrfData = await csrfResponse.json().catch(()=>({}));
+      if (!csrfResponse.ok || !csrfData.csrfToken) {
+        setMessage("دریافت کد امنیتی ورود انجام نشد. صفحه را تازه‌سازی کنید و دوباره تلاش کنید.");
+        return;
+      }
       const response = await fetch(`${API}/auth/mobile/`, {
-        method:"POST", credentials:"include", headers:{"Content-Type":"application/json"},
+        method:"POST", credentials:"include",
+        headers:{"Content-Type":"application/json","X-CSRFToken":csrfData.csrfToken},
         body:JSON.stringify({action:mode,mobile,password,full_name:fullName})
       });
       const data = await response.json().catch(()=>({}));
