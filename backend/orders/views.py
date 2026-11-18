@@ -132,7 +132,12 @@ class OrderViewSet(viewsets.ModelViewSet):
                         status=PrintOrder.Status.REVIEW,
                         original_filename=uploaded.name if uploaded else "")
 
-    @action(detail=False, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.AllowAny],
+        authentication_classes=[],
+    )
     def estimate(self, request):
         """Live tariff estimate; explicitly reports missing pricing configuration."""
         serializer = self.get_serializer(data=request.data)
