@@ -125,6 +125,12 @@ class PrintOrderAdmin(admin.ModelAdmin):
             quantity=obj.quantity, rule=rule,
         )
         super().save_model(request, obj, form, change)
+        # صدور/به‌روزرسانی فاکتور فقط وقتی مدیر قیمت نهایی را تعیین کرده و سفارش را Quote کرده باشد.
+        if obj.final_price_toman and obj.final_price_toman > 0 and obj.status == PrintOrder.Status.QUOTED:
+            Invoice.objects.update_or_create(order=obj, defaults={
+                "amount_toman": obj.final_price_toman,
+                "description": f"فاکتور سفارش {str(obj.public_id)[:8]}",
+            })
         if change:
             OrderRevision.objects.create(
                 order=obj, changed_by=request.user,
