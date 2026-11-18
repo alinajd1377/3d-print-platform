@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Printer, Layers3, ShieldCheck, Clock3, UploadCloud, Calculator, PackageCheck, Sparkles, ArrowLeft, Box, Cpu } from "lucide-react";
 
 const services = [
@@ -7,11 +10,13 @@ const services = [
 ];
 
 export default function Home() {
+  const [customer,setCustomer] = useState<{full_name:string;mobile:string}|null>(null);
+  useEffect(()=>{fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/profile/`,{credentials:"include"}).then(r=>r.ok?r.json():null).then(p=>setCustomer(p?{full_name:p.full_name||"",mobile:p.mobile||""}:null)).catch(()=>setCustomer(null));},[]);
   return <>
     <header className="topbar"><div className="container nav">
       <a className="logo" href="/"><span className="logo-mark"><Box size={21}/></span> پرینت‌یار <small>3D PRINT</small></a>
       <nav className="navlinks"><a href="#services">خدمات</a><a href="/store">فروشگاه</a><a href="/account">حساب کاربری</a><a href="#steps">مراحل سفارش</a><a href="#why">چرا ما؟</a></nav>
-      <div className="nav-actions"><a className="btn nav-login" href="/login">ورود / ثبت‌نام</a><a className="btn nav-cta" href="/order">ثبت سفارش <ArrowLeft size={17}/></a></div>
+      <div className="nav-actions">{customer?<a className="btn nav-login" href="/account">{customer.full_name||customer.mobile||"حساب کاربری"}</a>:<a className="btn nav-login" href="/login">ورود / ثبت‌نام</a>}<a className="btn nav-cta" href="/order">ثبت سفارش <ArrowLeft size={17}/></a></div>
     </div></header>
     <main>
       <section className="hero"><div className="hero-orb orb-one"/><div className="hero-orb orb-two"/>
