@@ -129,6 +129,54 @@ class OrderViewSet(viewsets.ModelViewSet):
                         estimated_hours=hours, estimated_price_toman=price,
                         original_filename=uploaded.name if uploaded else "")
 
+    @action(detail=False, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def estimate(self, request):
+        """Live tariff estimate; explicitly reports missing pricing configuration."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        material = data["material"]
+        machine = Machine.objects.filter(
+            is_active=True, technology=data["technology"]
+        ).filter(Q(supported_materials=material) | Q(supported_materials__isnull=True)).distinct().order_by("supported_materials__isnull").first()
+        volume = data.get("model_volume_cm3", 0)
+        height = data.get("model_height_mm", 0)
+        infill = data.get("infill_percent", 20)
+        supports = data.get("supports", True)
+        layer = data.get("layer_height_mm", 0.20)
+        nozzle = data.get("nozzle_diameter_mm", 0.40)
+        quantity = data.get("quantity", 1)
+        from decimal import Decimal, ROUND_CEILING
+        if data["technology"] == "FDM":
+            weight, hours = estimate_geometry(volume_cm3=volume, density_g_cm3=material.density_g_cm3,
+                infill_percent=infill, nozzle_mm=nozzle, layer_mm=layer, machine=machine)
+        else:
+            factor = Decimal("1.10") if supports else Decimal("1.00")
+            weight = (Decimal(str(volume or 0))*Decimal(str(material.density_g_cm3))*factor).quantize(Decimal("0.01"))
+            if machine and Decimal(str(height or 0)) > 0 and Decimal(str(layer or 0)) > 0:
+                layers = (Decimal(str(height))/Decimal(str(layer))).to_integral_value(rounding=ROUND_CEILING)
+                seconds = machine.resin_exposure_seconds_per_layer + machine.resin_lift_seconds_per_layer
+                hours = (layers*seconds*Decimal("1.15")/Decimal("3600")).quantize(Decimal("0.01"))
+            else:
+                hours = Decimal("0")
+        rule = PricingRule.objects.filter(is_active=True).order_by("id").first()
+        price = estimate_price(material=material, machine=machine, weight_g=weight, hours=hours,
+            infill_percent=infill, supports=supports, quantity=quantity, rule=rule)
+        missing = []
+        if not machine: missing.append("دستگاه فعال و سازگار برای این تکنولوژی/متریال تعریف نشده است.")
+        if material.price_per_gram_toman <= 0: missing.append("قیمت هر گرم متریال در پنل ادمین صفر است.")
+        if not machine or machine.hourly_rate_toman <= 0: missing.append("تعرفه ساعتی دستگاه در پنل ادمین تنظیم نشده است.")
+        if volume <= 0: missing.append("حجم هندسی معتبر فایل هنوز دریافت نشده است.")
+        if data["technology"] == "RESIN" and (not machine or machine.resin_exposure_seconds_per_layer <= 0):
+            missing.append("زمان نوردهی رزین دستگاه تنظیم نشده است.")
+        if price <= 0: missing.append("قیمت برآوردی صفر است؛ تعرفه‌ها و حداقل مبلغ سفارش را بررسی کنید.")
+        return Response({
+            "estimated_weight_g": str(weight), "estimated_hours": str(hours),
+            "estimated_price_toman": price, "machine_name": machine.name if machine else None,
+            "ready": not missing, "missing_configuration": missing,
+            "note": "این تخمین هندسی است و خروجی Slicer واقعی یا قیمت قطعی نیست."
+        })
+
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
     def quote(self, request, public_id=None):
         order = self.get_object()
