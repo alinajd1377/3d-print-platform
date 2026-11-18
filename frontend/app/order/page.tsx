@@ -31,6 +31,7 @@ export default function OrderPage() {
   const [busy,setBusy] = useState(false);
   const [liveEstimate,setLiveEstimate] = useState<{estimated_weight_g:string;estimated_hours:string;estimated_price_toman:number;ready:boolean;missing_configuration:string[];note:string}|null>(null);
   const [estimateLoading,setEstimateLoading] = useState(false);
+  const [estimateError,setEstimateError] = useState("");
 
   useEffect(() => {
     fetch(`${API}/materials/`).then(r=>r.ok?r.json():[]).then((data:Material[])=>setMaterials(data)).catch(()=>setMaterials([]));
@@ -105,10 +106,11 @@ export default function OrderPage() {
   const fitsMachine = modelInfo && compatibleMachines.some(m=>modelInfo.x<=m.build_x_mm && modelInfo.y<=m.build_y_mm && modelInfo.z<=m.build_z_mm);
 
   useEffect(() => {
-    if (!material || !modelInfo || fileError) { setLiveEstimate(null); return; }
+    if (!material || !modelInfo || fileError) { setLiveEstimate(null); setEstimateError(""); return; }
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setEstimateLoading(true);
+      setEstimateError("");
       try {
         const token = decodeURIComponent(csrfToken());
         const response = await fetch(`${API}/orders/estimate/`, {
@@ -124,8 +126,17 @@ export default function OrderPage() {
           })())
         });
         const data = await response.json().catch(()=>null);
-        if (!cancelled) setLiveEstimate(response.ok?data:null);
-      } catch { if (!cancelled) setLiveEstimate(null); }
+        if (!cancelled) {
+          if (response.ok && data) { setLiveEstimate(data); setEstimateError(""); }
+          else {
+            setLiveEstimate(null);
+            const detail = data?.detail || data?.message || (data && typeof data === "object" ? Object.entries(data).map(([key,value])=>`${key}: ${Array.isArray(value)?value.join("، "):typeof value==="string"?value:JSON.stringify(value)}`).join(" | ") : "پاسخ نامعتبر از سرور");
+            setEstimateError(`خطای API (HTTP ${response.status}): ${detail || "برآورد محاسبه نشد."}`);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) { setLiveEstimate(null); setEstimateError(error instanceof Error ? `خطای ارتباط با API: ${error.message}` : "ارتباط با API برقرار نشد."); }
+      }
       finally { if (!cancelled) setEstimateLoading(false); }
     },350);
     return () => { cancelled=true; window.clearTimeout(timer); };
@@ -188,7 +199,7 @@ export default function OrderPage() {
             <div className="model-measures"><div><small>وزن تخمینی</small><b>{Number(liveEstimate.estimated_weight_g).toFixed(2)} گرم</b></div><div><small>زمان تخمینی</small><b>{Number(liveEstimate.estimated_hours).toFixed(2)} ساعت</b></div><div><small>قیمت تخمینی</small><b>{Number(liveEstimate.estimated_price_toman).toLocaleString("fa-IR")} تومان</b></div></div>
             {!liveEstimate.ready&&<ul className="estimate-warnings">{liveEstimate.missing_configuration.map((item,i)=><li key={i}>{item}</li>)}</ul>}
             <small>{liveEstimate.note}</small>
-          </>:<p>{!material?"برای مشاهده برآورد، متریال را انتخاب کنید.":!modelInfo?"ابتدا فایل سه‌بعدی معتبر را بارگذاری کنید.":"برآورد در دسترس نیست؛ اتصال و تنظیمات قیمت‌گذاری را بررسی کنید."}</p>}
+          </>:<p>{!material?"برای مشاهده برآورد، متریال را انتخاب کنید.":!modelInfo?"ابتدا فایل سه‌بعدی معتبر را بارگذاری کنید.":estimateError || "برآورد در دسترس نیست؛ پاسخ API دریافت نشد."}</p>}
         </div>
         <div className="estimate-note"><ShieldCheck/><span><b>برآورد اولیه وزن، زمان و قیمت</b><small>برای FDM، وزن و زمان با حجم هندسی، چگالی متریال، تراکم، نازل، لایه و تعرفه دستگاه تخمین زده می‌شود. این عدد جایگزین خروجی PrusaSlicer نیست و قیمت نهایی پس از بررسی فایل اعلام می‌شود. برای رزین، زمان از ارتفاع مدل، ضخامت لایه و زمان نوردهی و بالاآمدن هر لایه تخمین زده می‌شود؛ مدل‌های توخالی ممکن است وزن واقعی کمتری داشته باشند.</small></span></div>
         <button className="btn submit-order" disabled={busy}>{busy?"در حال ارسال...":"ارسال سفارش برای بررسی"} <ArrowRight size={18}/></button>
