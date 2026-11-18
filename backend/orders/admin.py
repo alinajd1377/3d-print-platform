@@ -4,14 +4,14 @@ from .models import (
     Material, Machine, PricingRule, PrintOption, PrintOrder,
     OrderRevision, Invoice, Payment,
 )
-from .pricing import estimate_price
+from .pricing import estimate_price, estimate_geometry
 
 
 @admin.register(Material)
 class MaterialAdmin(admin.ModelAdmin):
-    list_display = ("name", "technology", "price_per_gram_toman", "is_active")
+    list_display = ("name", "technology", "price_per_gram_toman", "density_g_cm3", "is_active")
     list_filter = ("technology", "is_active")
-    list_editable = ("price_per_gram_toman", "is_active")
+    list_editable = ("price_per_gram_toman", "density_g_cm3", "is_active")
     search_fields = ("name",)
 
 
@@ -26,6 +26,7 @@ class MachineAdmin(admin.ModelAdmin):
         ("محدوده چاپ (میلی‌متر)", {"fields": ("build_x_mm", "build_y_mm", "build_z_mm")}),
         ("محدودیت‌های فنی", {"fields": ("nozzle_diameters", "min_layer_height_mm",
                                       "max_layer_height_mm", "max_print_speed_mm_s",
+                                      "resin_exposure_seconds_per_layer", "resin_lift_seconds_per_layer",
                                       "supported_materials", "slicer_profile")}),
     )
 
@@ -78,7 +79,7 @@ class PrintOrderAdmin(admin.ModelAdmin):
         ("مشتری و فایل", {"fields": ("public_id", "customer", "file", "original_filename")}),
         ("تنظیمات چاپ (قابل ویرایش مدیر)", {"fields": (
             "technology", "material", "machine", "color", "infill_percent",
-            "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity")}),
+            "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "model_height_mm")}),
         ("برآورد و مبلغ نهایی", {"fields": (
             "estimated_weight_g", "estimated_hours", "estimated_price_toman",
             "final_price_toman")}),
@@ -89,14 +90,33 @@ class PrintOrderAdmin(admin.ModelAdmin):
         if change:
             old = PrintOrder.objects.get(pk=obj.pk)
             fields = ("technology", "material_id", "machine_id", "color", "infill_percent",
-                      "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity", "estimated_weight_g",
+                      "layer_height_mm", "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "model_height_mm", "estimated_weight_g",
                       "estimated_hours", "estimated_price_toman", "final_price_toman",
                       "status", "admin_note", "file")
             before = {}
             for field in fields:
                 value = getattr(old, field)
                 before[field] = str(value) if value is not None else None
-        # پس از تغییر تنظیمات فنی، برآورد دوباره با تعرفه فعلی محاسبه می‌شود.
+        # پس از تغییر تنظیمات فنی، وزن و زمان تخمینی نیز دوباره محاسبه می‌شوند.
+        if obj.technology == "FDM":
+            obj.estimated_weight_g, obj.estimated_hours = estimate_geometry(
+                volume_cm3=obj.model_volume_cm3,
+                density_g_cm3=obj.material.density_g_cm3,
+                infill_percent=obj.infill_percent,
+                nozzle_mm=obj.nozzle_diameter_mm,
+                layer_mm=obj.layer_height_mm,
+                machine=obj.machine,
+            )
+        else:
+            from decimal import Decimal, ROUND_CEILING
+            support_factor = Decimal("1.10") if obj.supports else Decimal("1.00")
+            obj.estimated_weight_g = (Decimal(str(obj.model_volume_cm3 or 0)) * Decimal(str(obj.material.density_g_cm3)) * support_factor).quantize(Decimal("0.01"))
+            if obj.machine and obj.model_height_mm > 0 and obj.layer_height_mm > 0:
+                layers = (obj.model_height_mm / obj.layer_height_mm).to_integral_value(rounding=ROUND_CEILING)
+                seconds = obj.machine.resin_exposure_seconds_per_layer + obj.machine.resin_lift_seconds_per_layer
+                obj.estimated_hours = (layers * seconds * Decimal("1.15") / Decimal("3600")).quantize(Decimal("0.01"))
+            else:
+                obj.estimated_hours = Decimal("0")
         rule = PricingRule.objects.filter(is_active=True).order_by("id").first()
         obj.estimated_price_toman = estimate_price(
             material=obj.material, machine=obj.machine,
@@ -105,6 +125,12 @@ class PrintOrderAdmin(admin.ModelAdmin):
             quantity=obj.quantity, rule=rule,
         )
         super().save_model(request, obj, form, change)
+        # صدور/به‌روزرسانی فاکتور فقط وقتی مدیر قیمت نهایی را تعیین کرده و سفارش را Quote کرده باشد.
+        if obj.final_price_toman and obj.final_price_toman > 0 and obj.status == PrintOrder.Status.QUOTED:
+            Invoice.objects.update_or_create(order=obj, defaults={
+                "amount_toman": obj.final_price_toman,
+                "description": f"فاکتور سفارش {str(obj.public_id)[:8]}",
+            })
         if change:
             OrderRevision.objects.create(
                 order=obj, changed_by=request.user,
@@ -132,3 +158,85 @@ class InvoiceAdmin(admin.ModelAdmin):
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
     list_display = ("id", "invoice", "amount_toman", "status", "authority", "ref_id")
+
+
+from .models import CustomerProfile, StoreProduct, ProductVariant, StoreOrder, StoreOrderItem, SiteSettings, ProductImage
+
+
+@admin.register(CustomerProfile)
+class CustomerProfileAdmin(admin.ModelAdmin):
+    list_display = ("mobile", "full_name", "postal_code", "updated_at")
+    search_fields = ("mobile", "full_name", "user__username")
+
+
+class ProductImageInline(admin.TabularInline):
+    model = ProductImage
+    extra = 1
+
+
+class ProductVariantInline(admin.TabularInline):
+    model = ProductVariant
+    extra = 1
+
+
+@admin.register(StoreProduct)
+class StoreProductAdmin(admin.ModelAdmin):
+    list_display = ("title", "slug", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("title", "description")
+    prepopulated_fields = {"slug": ("title",)}
+    inlines = (ProductVariantInline, ProductImageInline)
+
+
+@admin.register(ProductVariant)
+class ProductVariantAdmin(admin.ModelAdmin):
+    list_display = ("product", "color", "price_toman", "stock", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("product__title", "color", "sku")
+
+
+class StoreOrderItemInline(admin.TabularInline):
+    model = StoreOrderItem
+    extra = 0
+    readonly_fields = ("variant", "quantity", "unit_price_toman")
+
+
+@admin.register(StoreOrder)
+class StoreOrderAdmin(admin.ModelAdmin):
+    list_display = ("id", "customer", "status", "total_toman", "created_at")
+    list_filter = ("status",)
+    search_fields = ("customer__username", "customer__customer_profile__mobile")
+    inlines = (StoreOrderItemInline,)
+
+
+@admin.register(SiteSettings)
+class SiteSettingsAdmin(admin.ModelAdmin):
+    fieldsets = (
+        ("مشخصات", {"fields": ("site_name", "contact_phone", "contact_email", "contact_address", "working_hours")}),
+        ("شبکه‌های اجتماعی", {"fields": ("telegram_url", "bale_url", "instagram_url", "x_url", "whatsapp_url")}),
+        ("نشان‌ها و پرداخت", {"fields": ("enamad_image_url", "payment_logo_url", "payment_enabled")}),
+    )
+    list_display = ("site_name", "contact_phone", "contact_email", "updated_at")
+    readonly_fields = ("updated_at",)
+
+    def has_add_permission(self, request):
+        return not self.model.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        from django.shortcuts import redirect
+        from django.urls import reverse
+
+        obj = self.model.objects.order_by("pk").first()
+        if obj:
+            url = reverse(
+                f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_change",
+                args=(obj.pk,),
+            )
+        else:
+            url = reverse(
+                f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_add"
+            )
+        return redirect(url)

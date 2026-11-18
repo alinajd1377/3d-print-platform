@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Printer, Layers3, ShieldCheck, Clock3, UploadCloud, Calculator, PackageCheck, Sparkles, ArrowLeft, Box, Cpu } from "lucide-react";
 
 const services = [
@@ -7,11 +10,13 @@ const services = [
 ];
 
 export default function Home() {
+  const [customer,setCustomer] = useState<{full_name:string;mobile:string}|null>(null);
+  useEffect(()=>{fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/profile/`,{credentials:"include"}).then(r=>r.ok?r.json():null).then(p=>setCustomer(p?{full_name:p.full_name||"",mobile:p.mobile||""}:null)).catch(()=>setCustomer(null));},[]);
   return <>
     <header className="topbar"><div className="container nav">
       <a className="logo" href="/"><span className="logo-mark"><Box size={21}/></span> پرینت‌یار <small>3D PRINT</small></a>
-      <nav className="navlinks"><a href="#services">خدمات</a><a href="#steps">مراحل سفارش</a><a href="#why">چرا ما؟</a></nav>
-      <a className="btn nav-cta" href="/order">ثبت سفارش <ArrowLeft size={17}/></a>
+      <nav className="navlinks"><a href="#services">خدمات</a><a href="/store">فروشگاه</a><a href="/account">حساب کاربری</a><a href="#steps">مراحل سفارش</a><a href="#why">چرا ما؟</a></nav>
+      <div className="nav-actions">{customer?<a className="btn nav-login" href="/account">{customer.full_name||customer.mobile||"حساب کاربری"}</a>:<a className="btn nav-login" href="/login">ورود / ثبت‌نام</a>}<a className="btn nav-cta" href="/order">ثبت سفارش <ArrowLeft size={17}/></a></div>
     </div></header>
     <main>
       <section className="hero"><div className="hero-orb orb-one"/><div className="hero-orb orb-two"/>
@@ -52,6 +57,5 @@ export default function Home() {
         <div className="why-list"><div><ShieldCheck/><span><b>کنترل کیفیت فنی</b><small>بررسی فایل و سازگاری تنظیمات پیش از تولید</small></span></div><div><Clock3/><span><b>شفافیت در وضعیت سفارش</b><small>پیگیری مراحل از پنل کاربری</small></span></div><div><PackageCheck/><span><b>اطلاع‌رسانی تا تحویل</b><small>نمایش وضعیت آماده‌سازی و ارسال</small></span></div></div>
       </div></section>
     </main>
-    <footer className="footer"><div className="container footer-inner"><a className="logo" href="/">پرینت‌یار <small>3D PRINT</small></a><span>© پرینت‌یار — سامانه سفارش آنلاین چاپ سه‌بعدی</span></div></footer>
   </>;
 }

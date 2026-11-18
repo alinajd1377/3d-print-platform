@@ -1,11 +1,12 @@
 from rest_framework import serializers
+from decimal import Decimal, InvalidOperation
 from .models import Material, Machine, PrintOption, PrintOrder
 
 
 class MaterialSerializer(serializers.ModelSerializer):
     class Meta:
         model = Material
-        fields = ("id", "name", "technology", "price_per_gram_toman")
+        fields = ("id", "name", "technology", "price_per_gram_toman", "density_g_cm3")
 
 
 class MachineSerializer(serializers.ModelSerializer):
@@ -13,7 +14,8 @@ class MachineSerializer(serializers.ModelSerializer):
         model = Machine
         fields = ("id", "name", "technology", "hourly_rate_toman", "setup_fee_toman",
                   "build_x_mm", "build_y_mm", "build_z_mm", "nozzle_diameters",
-                  "min_layer_height_mm", "max_layer_height_mm")
+                  "min_layer_height_mm", "max_layer_height_mm", "max_print_speed_mm_s",
+                  "resin_exposure_seconds_per_layer", "resin_lift_seconds_per_layer")
 
 
 class PrintOptionSerializer(serializers.ModelSerializer):
@@ -24,15 +26,18 @@ class PrintOptionSerializer(serializers.ModelSerializer):
 
 class PrintOrderSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source="material.name", read_only=True)
+    payment_status = serializers.SerializerMethodField()
+    payment_amount_toman = serializers.SerializerMethodField()
+    payment_invoice_id = serializers.SerializerMethodField()
 
     class Meta:
         model = PrintOrder
         fields = (
             "public_id", "file", "original_filename", "technology", "material",
             "material_name", "machine", "color", "infill_percent", "layer_height_mm",
-            "nozzle_diameter_mm", "supports", "quantity", "estimated_weight_g", "estimated_hours",
+            "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "model_height_mm", "estimated_weight_g", "estimated_hours",
             "estimated_price_toman", "final_price_toman", "admin_note", "status",
-            "created_at",
+            "payment_status", "payment_amount_toman", "payment_invoice_id", "created_at",
         )
         read_only_fields = (
             "public_id", "machine", "estimated_weight_g", "estimated_hours",
@@ -40,7 +45,34 @@ class PrintOrderSerializer(serializers.ModelSerializer):
             "status", "created_at", "original_filename",
         )
 
+    def get_payment_status(self, obj):
+        try:
+            invoice = obj.invoice
+        except Exception:
+            return "NOT_INVOICED"
+        if invoice.is_paid:
+            return "PAID"
+        latest = invoice.payments.order_by("-created_at").first()
+        return latest.status if latest else "PENDING"
+
+    def get_payment_invoice_id(self, obj):
+        try:
+            return obj.invoice.id
+        except Exception:
+            return None
+
+    def get_payment_amount_toman(self, obj):
+        try:
+            return obj.invoice.amount_toman
+        except Exception:
+            return None
+
     def validate(self, attrs):
+        volume = attrs.get("model_volume_cm3", getattr(self.instance, "model_volume_cm3", 0))
+        if volume is not None and volume < 0:
+            raise serializers.ValidationError({"model_volume_cm3": "حجم مدل نمی‌تواند منفی باشد."})
+        if volume is not None and volume > 100000:
+            raise serializers.ValidationError({"model_volume_cm3": "حجم مدل از محدوده مجاز بیشتر است."})
         technology = attrs.get("technology", getattr(self.instance, "technology", None))
         material = attrs.get("material", getattr(self.instance, "material", None))
         machine = attrs.get("machine", getattr(self.instance, "machine", None))
@@ -69,6 +101,63 @@ class PrintOrderSerializer(serializers.ModelSerializer):
             submitted_key = {"layer_height": "layer_height_mm", "nozzle_diameter": "nozzle_diameter_mm"}.get(key, key)
             if submitted_key in self.initial_data and not allowed:
                 raise serializers.ValidationError({key: "این گزینه هنوز توسط مدیر فعال نشده است."})
-            if allowed and value not in allowed:
+            matches = value in allowed
+            if key in ("layer_height", "nozzle_diameter") and allowed:
+                try:
+                    submitted_number = Decimal(value)
+                    matches = any(submitted_number == Decimal(str(candidate)) for candidate in allowed)
+                except (InvalidOperation, ValueError):
+                    matches = False
+            if allowed and not matches:
                 raise serializers.ValidationError({key: "این گزینه در حال حاضر فعال یا مجاز نیست."})
         return attrs
+
+
+from .models import CustomerProfile, StoreProduct, ProductVariant, StoreOrder, StoreOrderItem, SiteSettings
+
+
+class CustomerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomerProfile
+        fields = ("mobile", "full_name", "address", "postal_code", "updated_at")
+        read_only_fields = ("mobile", "updated_at")
+
+
+class ProductVariantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductVariant
+        fields = ("id", "color", "price_toman", "stock")
+
+
+class StoreProductSerializer(serializers.ModelSerializer):
+    variants = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StoreProduct
+        fields = ("id", "title", "slug", "description", "variants", "images")
+
+    def get_variants(self, obj):
+        qs = obj.variants.filter(is_active=True)
+        return ProductVariantSerializer(qs, many=True).data
+
+    def get_images(self, obj):
+        request = self.context.get("request")
+        result = []
+        for item in obj.images.all():
+            url = item.image.url
+            result.append({"url": request.build_absolute_uri(url) if request else url, "alt_text": item.alt_text})
+        return result
+
+
+class StoreOrderCreateSerializer(serializers.Serializer):
+    variant_id = serializers.IntegerField(min_value=1)
+    quantity = serializers.IntegerField(min_value=1, max_value=100)
+
+
+class SiteSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SiteSettings
+        fields = ("site_name", "contact_phone", "contact_email", "telegram_url", "bale_url",
+                  "instagram_url", "x_url", "whatsapp_url", "contact_address", "working_hours",
+                  "enamad_image_url", "payment_logo_url", "payment_enabled")

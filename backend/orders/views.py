@@ -1,15 +1,19 @@
 from django.conf import settings
+from django.contrib.auth import authenticate, get_user_model, login as auth_login, logout as auth_logout
 from django.db import transaction
+from django.db.models import F
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import permissions, status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from .models import Material, Machine, PricingRule, PrintOption, PrintOrder, Invoice, Payment
 from .serializers import MaterialSerializer, MachineSerializer, PrintOptionSerializer, PrintOrderSerializer
-from .pricing import estimate_price
+from .pricing import estimate_price, estimate_geometry
 from .zarinpal import request_payment, verify_payment
 
 class IsStaffOrReadOnly(permissions.BasePermission):
@@ -78,19 +82,101 @@ class OrderViewSet(viewsets.ModelViewSet):
                 float(value) for value in machine.nozzle_diameters
             }:
                 raise ValidationError({"nozzle_diameter_mm": "قطر نازل با دستگاه انتخاب‌شده سازگار نیست."})
-        # وزن و زمان از سمت مشتری پذیرفته نمی‌شوند؛ تا اتصال Slicer صفر می‌مانند.
-        weight = 0
-        hours = 0
-        qty = serializer.validated_data.get("quantity", 1)
+        if serializer.validated_data["technology"] == "FDM":
+            from decimal import Decimal
+            layer_check = Decimal(str(serializer.validated_data.get("layer_height_mm", "0.20")))
+            nozzle_check = Decimal(str(serializer.validated_data.get("nozzle_diameter_mm", "0.40")))
+            if layer_check > nozzle_check * Decimal("0.75"):
+                raise ValidationError({"layer_height_mm": "ضخامت لایه نباید بیشتر از ۷۵٪ قطر نازل باشد."})
+
+        volume = serializer.validated_data.get("model_volume_cm3", 0)
         infill = serializer.validated_data.get("infill_percent", 20)
         supports = serializer.validated_data.get("supports", True)
+        layer = serializer.validated_data.get("layer_height_mm", 0.20)
+        nozzle = serializer.validated_data.get("nozzle_diameter_mm", 0.40)
+        qty = serializer.validated_data.get("quantity", 1)
+
+        if serializer.validated_data["technology"] == "FDM":
+            weight, hours = estimate_geometry(
+                volume_cm3=volume,
+                density_g_cm3=material.density_g_cm3,
+                infill_percent=infill,
+                nozzle_mm=nozzle,
+                layer_mm=layer,
+                machine=machine,
+            )
+        else:
+            # تخمین رزین بر پایه حجم جامد و تعداد لایه‌هاست؛ مدل‌های توخالی ممکن است بیش‌برآورد شوند.
+            from decimal import Decimal, ROUND_CEILING
+            weight_factor = Decimal("1.10") if supports else Decimal("1.00")
+            weight = (Decimal(str(volume or 0)) * Decimal(str(material.density_g_cm3)) * weight_factor).quantize(Decimal("0.01"))
+            height = Decimal(str(serializer.validated_data.get("model_height_mm", 0) or 0))
+            layer_height = Decimal(str(layer or "0.05"))
+            if machine and height > 0 and layer_height > 0:
+                layer_count = (height / layer_height).to_integral_value(rounding=ROUND_CEILING)
+                seconds_per_layer = machine.resin_exposure_seconds_per_layer + machine.resin_lift_seconds_per_layer
+                hours = (layer_count * seconds_per_layer * Decimal("1.15") / Decimal("3600")).quantize(Decimal("0.01"))
+            else:
+                hours = Decimal("0")
+
         rule = PricingRule.objects.filter(is_active=True).order_by("id").first()
         price = estimate_price(material=material, machine=machine, weight_g=weight,
                                hours=hours, infill_percent=infill, supports=supports,
                                quantity=qty, rule=rule)
         serializer.save(customer=self.request.user, machine=machine,
-                        estimated_price_toman=price,
+                        model_volume_cm3=volume,
+                        model_height_mm=serializer.validated_data.get("model_height_mm", 0), estimated_weight_g=weight,
+                        estimated_hours=hours, estimated_price_toman=price,
+                        status=PrintOrder.Status.REVIEW,
                         original_filename=uploaded.name if uploaded else "")
+
+    @action(detail=False, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def estimate(self, request):
+        """Live tariff estimate; explicitly reports missing pricing configuration."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        material = data["material"]
+        machine = Machine.objects.filter(
+            is_active=True, technology=data["technology"]
+        ).filter(Q(supported_materials=material) | Q(supported_materials__isnull=True)).distinct().order_by("supported_materials__isnull").first()
+        volume = data.get("model_volume_cm3", 0)
+        height = data.get("model_height_mm", 0)
+        infill = data.get("infill_percent", 20)
+        supports = data.get("supports", True)
+        layer = data.get("layer_height_mm", 0.20)
+        nozzle = data.get("nozzle_diameter_mm", 0.40)
+        quantity = data.get("quantity", 1)
+        from decimal import Decimal, ROUND_CEILING
+        if data["technology"] == "FDM":
+            weight, hours = estimate_geometry(volume_cm3=volume, density_g_cm3=material.density_g_cm3,
+                infill_percent=infill, nozzle_mm=nozzle, layer_mm=layer, machine=machine)
+        else:
+            factor = Decimal("1.10") if supports else Decimal("1.00")
+            weight = (Decimal(str(volume or 0))*Decimal(str(material.density_g_cm3))*factor).quantize(Decimal("0.01"))
+            if machine and Decimal(str(height or 0)) > 0 and Decimal(str(layer or 0)) > 0:
+                layers = (Decimal(str(height))/Decimal(str(layer))).to_integral_value(rounding=ROUND_CEILING)
+                seconds = machine.resin_exposure_seconds_per_layer + machine.resin_lift_seconds_per_layer
+                hours = (layers*seconds*Decimal("1.15")/Decimal("3600")).quantize(Decimal("0.01"))
+            else:
+                hours = Decimal("0")
+        rule = PricingRule.objects.filter(is_active=True).order_by("id").first()
+        price = estimate_price(material=material, machine=machine, weight_g=weight, hours=hours,
+            infill_percent=infill, supports=supports, quantity=quantity, rule=rule)
+        missing = []
+        if not machine: missing.append("دستگاه فعال و سازگار برای این تکنولوژی/متریال تعریف نشده است.")
+        if material.price_per_gram_toman <= 0: missing.append("قیمت هر گرم متریال در پنل ادمین صفر است.")
+        if not machine or machine.hourly_rate_toman <= 0: missing.append("تعرفه ساعتی دستگاه در پنل ادمین تنظیم نشده است.")
+        if volume <= 0: missing.append("حجم هندسی معتبر فایل هنوز دریافت نشده است.")
+        if data["technology"] == "RESIN" and (not machine or machine.resin_exposure_seconds_per_layer <= 0):
+            missing.append("زمان نوردهی رزین دستگاه تنظیم نشده است.")
+        if price <= 0: missing.append("قیمت برآوردی صفر است؛ تعرفه‌ها و حداقل مبلغ سفارش را بررسی کنید.")
+        return Response({
+            "estimated_weight_g": str(weight), "estimated_hours": str(hours),
+            "estimated_price_toman": price, "machine_name": machine.name if machine else None,
+            "ready": not missing, "missing_configuration": missing,
+            "note": "این تخمین هندسی است و خروجی Slicer واقعی یا قیمت قطعی نیست."
+        })
 
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
     def quote(self, request, public_id=None):
@@ -121,7 +207,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def pay_invoice(request, invoice_id):
-    if not settings.PAYMENTS_ENABLED:
+    if not settings.PAYMENTS_ENABLED or not SiteSettings.load().payment_enabled:
         return Response({"detail": "پرداخت آنلاین هنوز فعال نشده است."}, status=503)
     invoice = get_object_or_404(Invoice.objects.select_related("order"), pk=invoice_id, order__customer=request.user)
     if invoice.is_paid:
@@ -180,3 +266,132 @@ def zarinpal_callback(request, invoice_id):
             payment.save()
             result = "failed"
     return redirect(settings.FRONTEND_URL + f"/orders?payment={result}")
+
+
+from rest_framework.views import APIView
+from django.db.models import F
+from .models import CustomerProfile, StoreProduct, ProductVariant, StoreOrder, StoreOrderItem, SiteSettings
+from .serializers import CustomerProfileSerializer, StoreProductSerializer, StoreOrderCreateSerializer, SiteSettingsSerializer
+
+
+class MyProfileView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_profile(self, user):
+        profile, _ = CustomerProfile.objects.get_or_create(
+            user=user, defaults={"mobile": user.username[:20]}
+        )
+        return profile
+
+    def get(self, request):
+        return Response(CustomerProfileSerializer(self.get_profile(request.user)).data)
+
+    def patch(self, request):
+        profile = self.get_profile(request.user)
+        serializer = CustomerProfileSerializer(profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class PublicStoreView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        products = StoreProduct.objects.filter(is_active=True).prefetch_related("variants")
+        return Response(StoreProductSerializer(products, many=True).data)
+
+
+class StoreOrderCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        orders = StoreOrder.objects.filter(customer=request.user).prefetch_related("items__variant__product")
+        result = []
+        for order in orders:
+            result.append({
+                "id": order.pk,
+                "status": order.status,
+                "total_toman": order.total_toman,
+                "created_at": order.created_at,
+                "coordination_note": order.coordination_note,
+                "items": [{
+                    "product": item.variant.product.title,
+                    "color": item.variant.color,
+                    "quantity": item.quantity,
+                    "unit_price_toman": item.unit_price_toman,
+                } for item in order.items.all()],
+            })
+        return Response(result)
+
+    def post(self, request):
+        serializer = StoreOrderCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        with transaction.atomic():
+            variant = get_object_or_404(
+                ProductVariant.objects.select_for_update().select_related("product"),
+                pk=data["variant_id"], is_active=True, product__is_active=True
+            )
+            qty = data["quantity"]
+            enough_stock = variant.stock >= qty
+            order = StoreOrder.objects.create(
+                customer=request.user,
+                status=StoreOrder.Status.PENDING if enough_stock else StoreOrder.Status.COORDINATION,
+                total_toman=variant.price_toman * qty,
+                coordination_note="" if enough_stock else "موجودی کافی نیست؛ لطفاً برای هماهنگی با مشتری تماس گرفته شود."
+            )
+            StoreOrderItem.objects.create(
+                order=order, variant=variant, quantity=qty, unit_price_toman=variant.price_toman
+            )
+            if enough_stock:
+                ProductVariant.objects.filter(pk=variant.pk).update(stock=F("stock") - qty)
+        return Response({
+            "order_id": order.pk,
+            "status": order.status,
+            "total_toman": order.total_toman,
+            "message": "سفارش ثبت شد." if enough_stock else "موجودی کافی نیست؛ درخواست برای هماهنگی با پشتیبانی ثبت شد."
+        }, status=201)
+
+
+class PublicSiteSettingsView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        return Response(SiteSettingsSerializer(SiteSettings.load()).data)
+
+
+class MobileAuthView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    @method_decorator(ensure_csrf_cookie)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def post(self, request):
+        action_name = request.data.get("action", "login")
+        if action_name == "logout":
+            auth_logout(request)
+            return Response({"authenticated": False})
+        mobile = str(request.data.get("mobile", "")).strip()
+        password = str(request.data.get("password", ""))
+        if not mobile or len(mobile) > 20 or not mobile.isdigit():
+            return Response({"detail": "شماره موبایل معتبر وارد کنید."}, status=400)
+        if len(password) < 8:
+            return Response({"detail": "رمز عبور باید حداقل ۸ کاراکتر باشد."}, status=400)
+
+        User = get_user_model()
+        if action_name == "register":
+            if User.objects.filter(username=mobile).exists() or CustomerProfile.objects.filter(mobile=mobile).exists():
+                return Response({"detail": "این شماره موبایل قبلاً ثبت شده است."}, status=400)
+            full_name = str(request.data.get("full_name", "")).strip()
+            user = User.objects.create_user(username=mobile, password=password, first_name=full_name[:150])
+            CustomerProfile.objects.create(user=user, mobile=mobile, full_name=full_name[:160])
+            auth_login(request, user)
+            return Response({"authenticated": True, "mobile": mobile}, status=201)
+
+        user = authenticate(request, username=mobile, password=password)
+        if user is None:
+            return Response({"detail": "شماره موبایل یا رمز عبور صحیح نیست."}, status=400)
+        auth_login(request, user)
+        return Response({"authenticated": True, "mobile": mobile})

@@ -1,0 +1,49 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { Phone, Mail, MapPin, Clock3, Instagram, Send, MessageCircle, AtSign, Box, ArrowLeft } from "lucide-react";
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+type Settings = {site_name:string;contact_phone:string;contact_email:string;telegram_url:string;bale_url:string;instagram_url:string;x_url:string;whatsapp_url:string;contact_address:string;working_hours:string};
+type Profile = {full_name:string;mobile:string};
+
+export default function SiteChrome() {
+  const pathname = usePathname();
+  const [settings,setSettings] = useState<Settings|null>(null);
+  const [profile,setProfile] = useState<Profile|null>(null);
+  useEffect(()=>{
+    fetch(`${API}/site-settings/`).then(r=>r.ok?r.json():null).then(setSettings).catch(()=>setSettings(null));
+    const loadProfile=()=>fetch(`${API}/profile/`,{credentials:"include"}).then(r=>r.ok?r.json():null).then(p=>setProfile(p?{full_name:p.full_name||"",mobile:p.mobile||""}:null)).catch(()=>setProfile(null));
+    loadProfile();
+    const onFocus=()=>loadProfile();
+    window.addEventListener("focus",onFocus);
+    return ()=>window.removeEventListener("focus",onFocus);
+  },[pathname]);
+  const links = settings ? [
+    {label:"تلفن",href:settings.contact_phone?`tel:${settings.contact_phone.replace(/[^+0-9]/g,"")}`:"",Icon:Phone},
+    {label:"واتساپ",href:settings.whatsapp_url,Icon:MessageCircle},
+    {label:"تلگرام",href:settings.telegram_url,Icon:Send},
+    {label:"بله",href:settings.bale_url,Icon:MessageCircle},
+    {label:"اینستاگرام",href:settings.instagram_url,Icon:Instagram},
+    {label:"ایکس / توییتر",href:settings.x_url,Icon:AtSign},
+  ].filter(x=>x.href) : [];
+  return <>
+    {pathname !== "/" && <header className="topbar"><div className="container nav">
+      <a className="logo" href="/"><span className="logo-mark"><Box size={21}/></span> پرینت‌یار <small>3D PRINT</small></a>
+      <nav className="navlinks"><a href="/#services">خدمات</a><a href="/store">فروشگاه</a><a href="/account">حساب کاربری</a></nav>
+      <div className="nav-actions">{profile?<a className="btn nav-login" href="/account">{profile.full_name||profile.mobile||"حساب کاربری"}</a>:<a className="btn nav-login" href="/login">ورود / ثبت‌نام</a>}<a className="btn nav-cta" href="/order">ثبت سفارش <ArrowLeft size={17}/></a></div>
+    </div></header>}
+    <footer className="global-footer">
+    <div className="global-footer-inner">
+      <div className="global-footer-brand"><a href="/" className="logo">پرینت‌یار <small>3D PRINT</small></a><p>از فایل سه‌بعدی تا قطعه واقعی، همراه شما هستیم.</p></div>
+      <div className="global-footer-contact"><b>راه‌های ارتباطی</b><div className="global-socials">{links.map(({label,href,Icon})=><a key={label} href={href} aria-label={label} title={label} target={href.startsWith("http")?"_blank":undefined} rel="noreferrer"><Icon size={18}/><span>{label}</span></a>)}</div>
+        {settings?.contact_email&&<a className="footer-detail" href={`mailto:${settings.contact_email}`}><Mail size={15}/>{settings.contact_email}</a>}
+        {settings?.contact_address&&<span className="footer-detail"><MapPin size={15}/>{settings.contact_address}</span>}
+        {settings?.working_hours&&<span className="footer-detail"><Clock3 size={15}/>{settings.working_hours}</span>}
+      </div>
+    </div>
+    <div className="global-footer-bottom">© {new Date().getFullYear()} {settings?.site_name||"پرینت‌یار"} — تمامی حقوق محفوظ است</div>
+  </footer>
+  </>;
+}
