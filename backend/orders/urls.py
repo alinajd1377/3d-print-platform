@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import (MaterialViewSet, MachineViewSet, PrintOptionViewSet, OrderViewSet, pay_invoice, zarinpal_callback,
+from .views import (csrf_bootstrap, MaterialViewSet, MachineViewSet, PrintOptionViewSet, OrderViewSet, pay_invoice, zarinpal_callback,
                     MyProfileView, PublicStoreView, StoreOrderCreateView, PublicSiteSettingsView, MobileAuthView)
 
 router = DefaultRouter()
@@ -10,6 +10,7 @@ router.register("options", PrintOptionViewSet, basename="options")
 router.register("orders", OrderViewSet, basename="orders")
 
 urlpatterns = [
+    path("csrf/", csrf_bootstrap, name="csrf-bootstrap"),
     path("auth/mobile/", MobileAuthView.as_view(), name="mobile-auth"),
     path("profile/", MyProfileView.as_view(), name="my-profile"),
     path("store/products/", PublicStoreView.as_view(), name="store-products"),
