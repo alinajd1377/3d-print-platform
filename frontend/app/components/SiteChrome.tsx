@@ -6,11 +6,20 @@ import { Phone, Mail, MapPin, Clock3, Instagram, Send, MessageCircle, AtSign, Bo
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 type Settings = {site_name:string;contact_phone:string;contact_email:string;telegram_url:string;bale_url:string;instagram_url:string;x_url:string;whatsapp_url:string;contact_address:string;working_hours:string};
+type Profile = {full_name:string;mobile:string};
 
 export default function SiteChrome() {
   const pathname = usePathname();
   const [settings,setSettings] = useState<Settings|null>(null);
-  useEffect(()=>{fetch(`${API}/site-settings/`).then(r=>r.ok?r.json():null).then(setSettings).catch(()=>setSettings(null));},[]);
+  const [profile,setProfile] = useState<Profile|null>(null);
+  useEffect(()=>{
+    fetch(`${API}/site-settings/`).then(r=>r.ok?r.json():null).then(setSettings).catch(()=>setSettings(null));
+    const loadProfile=()=>fetch(`${API}/profile/`,{credentials:"include"}).then(r=>r.ok?r.json():null).then(p=>setProfile(p?{full_name:p.full_name||"",mobile:p.mobile||""}:null)).catch(()=>setProfile(null));
+    loadProfile();
+    const onFocus=()=>loadProfile();
+    window.addEventListener("focus",onFocus);
+    return ()=>window.removeEventListener("focus",onFocus);
+  },[pathname]);
   const links = settings ? [
     {label:"تلفن",href:settings.contact_phone?`tel:${settings.contact_phone.replace(/[^+0-9]/g,"")}`:"",Icon:Phone},
     {label:"واتساپ",href:settings.whatsapp_url,Icon:MessageCircle},
@@ -23,7 +32,7 @@ export default function SiteChrome() {
     {pathname !== "/" && <header className="topbar"><div className="container nav">
       <a className="logo" href="/"><span className="logo-mark"><Box size={21}/></span> پرینت‌یار <small>3D PRINT</small></a>
       <nav className="navlinks"><a href="/#services">خدمات</a><a href="/store">فروشگاه</a><a href="/account">حساب کاربری</a></nav>
-      <div className="nav-actions"><a className="btn nav-login" href="/login">ورود / ثبت‌نام</a><a className="btn nav-cta" href="/order">ثبت سفارش <ArrowLeft size={17}/></a></div>
+      <div className="nav-actions">{profile?<a className="btn nav-login" href="/account">{profile.full_name||profile.mobile||"حساب کاربری"}</a>:<a className="btn nav-login" href="/login">ورود / ثبت‌نام</a>}<a className="btn nav-cta" href="/order">ثبت سفارش <ArrowLeft size={17}/></a></div>
     </div></header>}
     <footer className="global-footer">
     <div className="global-footer-inner">
