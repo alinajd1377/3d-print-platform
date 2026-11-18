@@ -26,6 +26,8 @@ class PrintOptionSerializer(serializers.ModelSerializer):
 
 class PrintOrderSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source="material.name", read_only=True)
+    payment_status = serializers.SerializerMethodField()
+    payment_amount_toman = serializers.SerializerMethodField()
 
     class Meta:
         model = PrintOrder
@@ -34,13 +36,29 @@ class PrintOrderSerializer(serializers.ModelSerializer):
             "material_name", "machine", "color", "infill_percent", "layer_height_mm",
             "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "model_height_mm", "estimated_weight_g", "estimated_hours",
             "estimated_price_toman", "final_price_toman", "admin_note", "status",
-            "created_at",
+            "payment_status", "payment_amount_toman", "created_at",
         )
         read_only_fields = (
             "public_id", "machine", "estimated_weight_g", "estimated_hours",
             "estimated_price_toman", "final_price_toman", "admin_note",
             "status", "created_at", "original_filename",
         )
+
+    def get_payment_status(self, obj):
+        try:
+            invoice = obj.invoice
+        except Exception:
+            return "NOT_INVOICED"
+        if invoice.is_paid:
+            return "PAID"
+        latest = invoice.payments.order_by("-created_at").first()
+        return latest.status if latest else "PENDING"
+
+    def get_payment_amount_toman(self, obj):
+        try:
+            return obj.invoice.amount_toman
+        except Exception:
+            return None
 
     def validate(self, attrs):
         volume = attrs.get("model_volume_cm3", getattr(self.instance, "model_volume_cm3", 0))
