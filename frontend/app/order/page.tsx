@@ -114,8 +114,14 @@ export default function OrderPage() {
         const response = await fetch(`${API}/orders/estimate/`, {
           method:"POST", credentials:"include",
           headers:{"Content-Type":"application/json","X-CSRFToken":token},
-          body:JSON.stringify({technology,material,infill_percent:Number(infill),layer_height_mm:Number(layer),
-            nozzle_diameter_mm:Number(nozzle),supports,quantity,model_volume_cm3:modelInfo.volume,model_height_mm:modelInfo.z})
+          body:JSON.stringify((()=>{
+            const payload:Record<string,unknown> = {technology,material,quantity,model_volume_cm3:modelInfo.volume,model_height_mm:modelInfo.z};
+            if (infillOptions.length>0) payload.infill_percent=Number(infill);
+            if (layerOptions.length>0) payload.layer_height_mm=Number(layer);
+            if (nozzleOptions.length>0) payload.nozzle_diameter_mm=Number(nozzle);
+            if (supportOptions.length>0) payload.supports=supports;
+            return payload;
+          })())
         });
         const data = await response.json().catch(()=>null);
         if (!cancelled) setLiveEstimate(response.ok?data:null);
