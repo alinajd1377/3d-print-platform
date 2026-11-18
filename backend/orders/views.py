@@ -127,6 +127,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                         model_volume_cm3=volume,
                         model_height_mm=serializer.validated_data.get("model_height_mm", 0), estimated_weight_g=weight,
                         estimated_hours=hours, estimated_price_toman=price,
+                        status=PrintOrder.Status.REVIEW,
                         original_filename=uploaded.name if uploaded else "")
 
     @action(detail=False, methods=["post"], permission_classes=[permissions.IsAuthenticated])
