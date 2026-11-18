@@ -28,6 +28,7 @@ class PrintOrderSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source="material.name", read_only=True)
     payment_status = serializers.SerializerMethodField()
     payment_amount_toman = serializers.SerializerMethodField()
+    payment_invoice_id = serializers.SerializerMethodField()
 
     class Meta:
         model = PrintOrder
@@ -36,7 +37,7 @@ class PrintOrderSerializer(serializers.ModelSerializer):
             "material_name", "machine", "color", "infill_percent", "layer_height_mm",
             "nozzle_diameter_mm", "supports", "quantity", "model_volume_cm3", "model_height_mm", "estimated_weight_g", "estimated_hours",
             "estimated_price_toman", "final_price_toman", "admin_note", "status",
-            "payment_status", "payment_amount_toman", "created_at",
+            "payment_status", "payment_amount_toman", "payment_invoice_id", "created_at",
         )
         read_only_fields = (
             "public_id", "machine", "estimated_weight_g", "estimated_hours",
@@ -53,6 +54,12 @@ class PrintOrderSerializer(serializers.ModelSerializer):
             return "PAID"
         latest = invoice.payments.order_by("-created_at").first()
         return latest.status if latest else "PENDING"
+
+    def get_payment_invoice_id(self, obj):
+        try:
+            return obj.invoice.id
+        except Exception:
+            return None
 
     def get_payment_amount_toman(self, obj):
         try:
