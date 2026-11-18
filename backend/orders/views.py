@@ -69,10 +69,14 @@ class OrderViewSet(viewsets.ModelViewSet):
         # دستگاه واقعی از روی تکنولوژی و سازگاری متریال انتخاب می‌شود؛
         # مشتری حق انتخاب/تغییر دستگاه فیزیکی را ندارد.
         machine = Machine.objects.filter(
-            is_active=True, technology=serializer.validated_data["technology"]
-        ).filter(
-            Q(supported_materials=material) | Q(supported_materials__isnull=True)
-        ).distinct().order_by("supported_materials__isnull").first()
+            is_active=True, technology=serializer.validated_data["technology"],
+            supported_materials=material,
+        ).distinct().first()
+        if machine is None:
+            machine = Machine.objects.filter(
+                is_active=True, technology=serializer.validated_data["technology"],
+                supported_materials__isnull=True,
+            ).first()
         if machine:
             layer_height = serializer.validated_data.get("layer_height_mm", 0.20)
             if not (machine.min_layer_height_mm <= layer_height <= machine.max_layer_height_mm):
@@ -145,8 +149,14 @@ class OrderViewSet(viewsets.ModelViewSet):
         data = serializer.validated_data
         material = data["material"]
         machine = Machine.objects.filter(
-            is_active=True, technology=data["technology"]
-        ).filter(Q(supported_materials=material) | Q(supported_materials__isnull=True)).distinct().order_by("supported_materials__isnull").first()
+            is_active=True, technology=data["technology"],
+            supported_materials=material,
+        ).distinct().first()
+        if machine is None:
+            machine = Machine.objects.filter(
+                is_active=True, technology=data["technology"],
+                supported_materials__isnull=True,
+            ).first()
         volume = data.get("model_volume_cm3", 0)
         height = data.get("model_height_mm", 0)
         infill = data.get("infill_percent", 20)
